@@ -770,7 +770,24 @@ function fieldKey(label) {
   const text = normalize(label);
   const aliases = {
     productName: ["\u5546\u54C1\u540D\u79F0", "\u4EA7\u54C1\u540D\u79F0", "\u5546\u54C1\u540D", "\u4EA7\u54C1\u540D", "\u540D\u79F0", "product", "productname", "name"],
-    skuGroup: ["sku", "sku\u7EC4", "sku\u7D44", "skugroup"],
+    skuGroup: [
+      "sku",
+      "sku\u7EC4",
+      "sku\u7D44",
+      "skugroup",
+      "\u5546\u54C1\u7F16\u7801",
+      "\u5546\u54C1\u7DE8\u78BC",
+      "\u5546\u54C1\u7F16\u53F7",
+      "\u5546\u54C1\u7DE8\u865F",
+      "\u4EA7\u54C1\u7F16\u7801",
+      "\u7522\u54C1\u7DE8\u78BC",
+      "\u4EA7\u54C1\u7F16\u53F7",
+      "\u7522\u54C1\u7DE8\u865F",
+      "productcode",
+      "productid",
+      "itemcode",
+      "itemid"
+    ],
     targetStores: ["\u76EE\u6807\u5E97\u94FA", "\u76EE\u6A19\u5E97\u92EA", "\u5E97\u94FA", "\u5E97\u92EA", "\u76EE\u6807\u5E97", "\u76EE\u6A19\u5E97", "\u5E97", "stores", "targetstores"],
     sourceImages: ["\u56FE\u7247", "\u5716\u7247", "\u5546\u54C1\u56FE", "\u5546\u54C1\u5716", "\u5546\u54C1\u56FE\u7247", "\u5546\u54C1\u5716\u7247", "\u56FE\u7247\u8DEF\u5F84", "\u5716\u7247\u8DEF\u5F91", "\u56FE\u7247\u6765\u6E90", "\u5716\u7247\u4F86\u6E90", "sourceimages", "images"],
     notes: ["\u5907\u6CE8", "\u5099\u8A3B", "\u8981\u6C42", "\u4EA7\u54C1\u8981\u70B9", "\u5546\u54C1\u8981\u70B9", "notes"],

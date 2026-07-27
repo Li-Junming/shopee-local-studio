@@ -330,14 +330,14 @@ async function renderSourceReview(displayTask) {
       </div>
     </div>
     <div class="source-meta">
-      <div><span>SKU</span><strong>${escapeHtml(displayTask.skuGroup.join(" "))}</strong></div>
+      <div><span>\u5546\u54C1\u7F16\u7801/SKU</span><strong>${escapeHtml(displayTask.skuGroup.join(" "))}</strong></div>
       <div><span>1\u5e97\u6807\u9898</span><strong>${escapeHtml(review.title || selectedTask.sourceTitle || "\u5c1a\u672a\u68c0\u7d22")}</strong></div>
       <div><span>\u7f16\u8f91\u94fe\u63a5</span>${review.editUrl ? `<a href="${escapeHtml(review.editUrl)}" target="_blank" rel="noreferrer">\u6253\u5f00 1\u5e97\u5546\u54c1</a>` : "<strong>\u6682\u65e0</strong>"}</div>
     </div>
     <div class="source-risk-detail">
       <span>\u5339\u914d\u8bc1\u636e</span>
       <strong>${escapeHtml(risk.message || "\u5c1a\u65e0\u5339\u914d\u8bc1\u636e")}</strong>
-      <em>${escapeHtml((risk.matchedSkus || []).length ? `SKU: ${risk.matchedSkus.join(" ")}` : "\u672a\u5339\u914d\u5230 SKU")}</em>
+      <em>${escapeHtml((risk.matchedSkus || []).length ? `\u5546\u54C1\u7F16\u7801/SKU: ${risk.matchedSkus.join(" ")}` : "\u672a\u5339\u914d\u5230\u5546\u54C1\u7F16\u7801/SKU")}</em>
     </div>
     <div class="source-image-grid">${images.length ? images.map((image) => `
       <div class="source-image-item">

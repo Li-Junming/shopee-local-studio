@@ -85,6 +85,18 @@ test("parseTaskText accepts SKU-only task text", () => {
   assert.deepEqual(parsed.targetStores, []);
 });
 
+test("parseTaskText accepts product code aliases as identifier input", () => {
+  const parsed = parseTaskText(`
+\u5546\u54C1\u7F16\u7801: pc-001 pc-002
+  `);
+
+  assert.equal(parsed.productName, "");
+  assert.deepEqual(parsed.skuGroup, ["PC-001", "PC-002"]);
+  assert.deepEqual(parsed.targetStores, []);
+
+  assert.deepEqual(parseTaskText("Product Code: ab123 cd456").skuGroup, ["AB123", "CD456"]);
+});
+
 test("storesFor resolves supported target stores and rejects unknown stores", () => {
   assert.deepEqual(storesFor(["7", "9"]).map((store) => store.folder), [
     "store_7_skinora",
