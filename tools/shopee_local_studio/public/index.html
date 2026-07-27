@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Shopee Local Studio</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Shopee Local Studio</h1>
+        <p>SKU &#20219;&#21153; &middot; &#24215;&#38138;&#22270;&#32452; &middot; &#33609;&#31295;&#31665;&#33258;&#21160;&#20445;&#23384;</p>
+      </div>
+      <button id="refreshBtn" type="button">&#21047;&#26032;</button>
+    </header>
+
+    <main class="layout">
+      <section class="panel create-panel">
+        <h2>&#26032;&#20219;&#21153;</h2>
+
+        <div class="quick-box">
+          <label>
+            &#31896;&#36148;&#20219;&#21153;&#25991;&#26412;
+            <textarea id="quickTaskText" rows="8" placeholder="YSLD80501 YSLD80502&#10;SKU&#65306;YSLD80501 YSLD80502&#10;&#24215;&#38138;&#21482;&#30475;&#19979;&#26041;&#21246;&#36873;&#65292;&#36825;&#37324;&#19981;&#38656;&#35201;&#20889;&#30446;&#26631;&#24215;&#38138;"></textarea>
+          </label>
+          <div class="inline-actions">
+            <button id="parseQuickBtn" type="button">&#35299;&#26512;&#21040;&#34920;&#21333;</button>
+            <button id="createRunBtn" class="primary" type="button">&#21019;&#24314;&#24182;&#19968;&#38190;&#20840;&#27969;&#31243;</button>
+          </div>
+          <p class="hint">&#20219;&#21153;&#25991;&#26412;&#21487;&#20197;&#21482;&#31896;&#36148; SKU&#65307;&#30446;&#26631;&#24215;&#38138;&#21482;&#30475;&#19979;&#26041;&#21246;&#36873;&#12290;&#19968;&#38190;&#20840;&#27969;&#31243;&#20250;&#22312;&#21518;&#21488;&#20381;&#27425;&#29983;&#25104;&#22270;&#29255;&#12289;&#26597;&#25214; BigSeller &#33609;&#31295;&#12289;&#19978;&#20256;&#24182;&#28857;&#20987;&#8220;&#20445;&#23384;&#8221;&#12290;</p>
+        </div>
+
+        <form id="taskForm">
+          <label>
+            &#20135;&#21697;&#21517;&#31216;
+            <input name="productName" autocomplete="off" placeholder="&#20363;&#22914; Estee Lauder Soft Clean Infusion">
+          </label>
+          <label>
+            SKU &#32452;
+            <textarea name="skuGroup" rows="3" placeholder="YSLD80501 YSLD80502"></textarea>
+          </label>
+          <div class="field">
+            <span>&#30446;&#26631;&#24215;&#38138;</span>
+            <div id="storeChecks" class="store-grid"></div>
+          </div>
+          <label>
+            &#21830;&#21697;&#22270;&#36335;&#24452;
+            <textarea name="sourceImages" rows="7" placeholder="&#27599;&#34892;&#19968;&#20010;&#26412;&#22320;&#22270;&#29255;&#36335;&#24452;&#65292;&#20063;&#21487;&#20197;&#30452;&#25509; Ctrl+V &#31896;&#36148;&#22270;&#29255;"></textarea>
+          </label>
+          <div class="upload-zone" id="imageDropZone" tabindex="0">
+            <input id="imagePicker" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+            <button id="pickImagesBtn" type="button">&#36873;&#25321;&#22270;&#29255;</button>
+            <span>&#20063;&#21487;&#20197;&#22797;&#21046;&#22270;&#29255;&#21518;&#65292;&#22312;&#36825;&#37324;&#25110;&#19978;&#38754;&#30340;&#36335;&#24452;&#26694; Ctrl+V</span>
+          </div>
+          <label>
+            &#20135;&#21697;&#35201;&#28857;
+            <textarea name="notes" rows="4" placeholder="&#21151;&#25928;&#12289;&#23481;&#37327;&#12289;&#36136;&#22320;&#12289;&#36866;&#21512;&#20154;&#32676;"></textarea>
+          </label>
+          <button class="primary" type="submit">&#21019;&#24314;&#20219;&#21153;</button>
+        </form>
+      </section>
+
+      <section class="panel work-panel">
+        <div class="section-head">
+          <h2>&#20219;&#21153;</h2>
+          <select id="taskSelect"></select>
+        </div>
+
+        <div id="emptyState" class="empty">&#26242;&#26080;&#20219;&#21153;</div>
+        <div id="taskView" hidden>
+          <div class="summary-grid">
+            <div><span>&#20135;&#21697;</span><strong id="taskProduct"></strong></div>
+            <div><span>SKU</span><strong id="taskSkus"></strong></div>
+            <div><span>&#29366;&#24577;</span><strong id="taskStatus"></strong></div>
+          </div>
+
+          <div class="actions">
+            <button id="runAllBtn" class="primary" type="button">&#19968;&#38190;&#20840;&#27969;&#31243;</button>
+            <button id="writeImageConfigBtn" type="button">&#29983;&#25104;&#22270;&#29255;&#37197;&#32622;</button>
+            <button id="generateBtn" type="button">&#29983;&#25104;&#22270;&#29255;</button>
+            <button id="writeBigsellerBtn" type="button">&#29983;&#25104;&#33609;&#31295;&#37197;&#32622;</button>
+            <button id="discoverBtn" type="button">&#26597;&#25214;&#33609;&#31295;</button>
+            <button id="saveBtn" class="danger" type="button">&#20445;&#23384;&#33609;&#31295;</button>
+          </div>
+
+          <div class="section-head">
+            <h3>&#26631;&#39064;&#35814;&#24773;</h3>
+            <div class="inline-actions">
+              <button id="regenerateListingsBtn" type="button">&#37325;&#26032;&#29983;&#25104;&#26631;&#39064;&#35814;&#24773;</button>
+              <button id="saveListingsBtn" type="button">&#20445;&#23384;&#25991;&#26412;</button>
+            </div>
+          </div>
+          <div id="listingEditors" class="listing-grid"></div>
+
+          <div class="section-head">
+            <h3>&#22270;&#29255;&#39044;&#35272;</h3>
+            <button id="reloadImagesBtn" type="button">&#37325;&#26032;&#35835;&#21462;</button>
+          </div>
+          <div id="imageGrid" class="image-grid"></div>
+
+          <div class="section-head">
+            <h3>&#26085;&#24535;</h3>
+            <button id="reloadLogsBtn" type="button">&#21047;&#26032;&#26085;&#24535;</button>
+          </div>
+          <pre id="logs" class="logs"></pre>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

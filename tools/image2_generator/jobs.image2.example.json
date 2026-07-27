@@ -1,0 +1,16 @@
+{
+  "model": "gpt-image-2",
+  "outputDir": "../../outputs/image2_test",
+  "size": "1024x1024",
+  "outputSize": 800,
+  "quality": "medium",
+  "outputFormat": "png",
+  "concurrency": 2,
+  "jobs": [
+    {
+      "name": "text_to_image_demo",
+      "prompt": "Create an integrated Vietnamese Shopee beauty ecommerce poster for a pink skincare toner. Clean premium layout, product brand visible, no authenticity badge, no SKU, no price.",
+      "out": "demo/01_main.png"
+    }
+  ]
+}

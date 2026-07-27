@@ -1,0 +1,498 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import path from "node:path";
+import {
+  buildBigSellerSkuConfig,
+  buildBigSellerSourceConfig,
+  buildImage2Config,
+  makeListingDraft,
+  parseTaskText,
+  parseSkuGroup,
+  requireBuyerProductIdentity,
+  sourceImagesMissingMessage,
+  storesFor,
+  validateVietnameseListing
+} from "../src/core.js";
+
+test("parseSkuGroup normalizes whitespace and duplicate SKU values", () => {
+  assert.deepEqual(parseSkuGroup("YSLD80501  YSLD80502\nYSLD80501"), [
+    "YSLD80501",
+    "YSLD80502"
+  ]);
+});
+
+test("parseTaskText extracts product task fields from pasted Chinese format", () => {
+  const parsed = parseTaskText(`
+SKU：YSLD80501  YSLD80502
+目标店铺：7、8、9
+图片：C:/tmp/a.png
+C:/tmp/b.png
+草稿箱：已复制
+备注：产品图要有品牌名，不要正品标识
+  `);
+
+  assert.equal(parsed.productName, "");
+  assert.deepEqual(parsed.skuGroup, ["YSLD80501", "YSLD80502"]);
+  assert.deepEqual(parsed.targetStores, []);
+  assert.equal(parsed.sourceImages, "C:/tmp/a.png\nC:/tmp/b.png");
+  assert.equal(parsed.draftCopied, true);
+  assert.equal(parsed.notes, "产品图要有品牌名，不要正品标识");
+});
+
+test("parseTaskText accepts product name aliases and ignores pasted stores", () => {
+  const parsed = parseTaskText(`
+商品名称: Estee Lauder Soft Clean Infusion
+SKU组: YSLD80501,YSLD80502
+目标店铺: 7,9
+图片路径:
+"C:/images/main.png"
+"C:/images/real.png"
+  `);
+
+  assert.equal(parsed.productName, "Estee Lauder Soft Clean Infusion");
+  assert.deepEqual(parsed.skuGroup, ["YSLD80501", "YSLD80502"]);
+  assert.deepEqual(parsed.targetStores, []);
+  assert.equal(parsed.sourceImages, "C:/images/main.png\nC:/images/real.png");
+});
+
+test("parseTaskText accepts SKU-only task text", () => {
+  const parsed = parseTaskText("YSLD80501 YSLD80502");
+
+  assert.equal(parsed.productName, "");
+  assert.deepEqual(parsed.skuGroup, ["YSLD80501", "YSLD80502"]);
+  assert.deepEqual(parsed.targetStores, []);
+});
+
+test("storesFor resolves supported target stores and rejects unknown stores", () => {
+  assert.deepEqual(storesFor(["7", "9"]).map((store) => store.folder), [
+    "store_7_skinora",
+    "store_9_elora_skin"
+  ]);
+  assert.throws(() => storesFor(["10"]), /Unsupported store/);
+});
+
+test("buildImage2Config creates four PNG jobs per selected store", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Estee Lauder Soft Clean Infusion",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    targetStores: ["7", "8"],
+    sourceImages: ["C:/images/main.png", "C:/images/real.png"],
+    notes: "pink bottle"
+  });
+
+  assert.equal(config.outputSize, 800);
+  assert.equal(config.jobs.length, 8);
+  assert.equal(config.jobs[0].out, "store_7_skinora/01_product.png");
+  assert.equal(config.jobs[1].out, "store_7_skinora/02_effect.png");
+  assert.equal(config.jobs[2].out, "store_7_skinora/03_real.png");
+  assert.equal(config.jobs[3].out, "store_7_skinora/04_real.png");
+  assert.equal(config.jobs[4].out, "store_8_skinora_beauty/01_product.png");
+  assert.ok(config.jobs.every((job) => job.images.length === 2));
+  assert.ok(config.jobs[0].prompt.includes("No authenticity badge"));
+});
+
+test("buildImage2Config keeps free-form notes out of image prompts", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Estee Lauder Soft Clean Infusion",
+    skuGroup: ["YSLD80501"],
+    targetStores: ["7"],
+    sourceImages: ["C:/images/main.png"],
+    notes: "产品图要有品牌名，不要正品标识"
+  });
+
+  assert.equal(config.jobs[0].prompt.includes("产品图"), false);
+  assert.equal(config.jobs[0].prompt.includes("品牌名"), false);
+});
+
+test("describeImage2Runtime reports missing key and local proxy settings", async () => {
+  const { describeImage2Runtime } = await import("../src/core.js");
+
+  assert.deepEqual(describeImage2Runtime({ OPENAI_BASE_URL: "http://localhost:54273/v1" }), {
+    apiKeySet: false,
+    baseUrl: "http://localhost:54273/v1",
+    localProxy: { host: "localhost", port: 54273 }
+  });
+
+  assert.equal(describeImage2Runtime({ OPENAI_API_KEY: "x" }).apiKeySet, true);
+});
+
+test("buildBigSellerSkuConfig writes discover jobs using asset root", () => {
+  const assetRoot = path.resolve("outputs/local_studio/abc");
+  const config = buildBigSellerSkuConfig({
+    productName: "Lancome Genifique",
+    skuGroup: ["LC860101", "LC860102"],
+    assetRoot
+  });
+
+  assert.deepEqual(config.discoverJobs[0].skus, ["LC860101", "LC860102"]);
+  assert.equal(config.discoverJobs[0].assetRoot, assetRoot);
+});
+
+test("buildBigSellerSourceConfig writes source jobs using SKU group and source image directory", () => {
+  const sourceDir = path.resolve("outputs/source-images");
+  const config = buildBigSellerSourceConfig({
+    productName: "Lancome Genifique",
+    skuGroup: ["LC860101", "LC860102"],
+    sourceImageDir: sourceDir
+  });
+
+  assert.deepEqual(config.sourceJobs[0].skus, ["LC860101", "LC860102"]);
+  assert.equal(config.sourceJobs[0].outDir, sourceDir);
+  assert.equal(config.sourceJobs[0].sourceStoreMatch, "1店");
+});
+
+test("sourceImagesMissingMessage explains missing BigSeller source SKU match", () => {
+  const message = sourceImagesMissingMessage({
+    skuGroup: ["YSLD80501", "YSLD80502"]
+  });
+
+  assert.match(message, /YSLD80501, YSLD80502/);
+  assert.match(message, /1-store active listing/i);
+  assert.match(message, /paste\/upload source images/i);
+});
+
+test("validateVietnameseListing enforces title length and buyer-facing details", () => {
+  const title = "Estee Lauder Soft Clean Infusion nuoc hoa hong duong am lam diu da kho 400ml cao cap";
+  const detail = "Cong dung: Lam diu va cap am cho da kho, giup be mat da mem hon sau khi lam sach.";
+  assert.equal(validateVietnameseListing({ title, detail }).valid, true);
+
+  assert.deepEqual(validateVietnameseListing({
+    title: "Qua ngan",
+    detail: "SKU YSLD80501"
+  }).errors, [
+    "Title must be 80-100 characters.",
+    "Title and detail must not contain SKU or full SKU codes.",
+    "Detail is too short for buyer-facing product effects."
+  ]);
+});
+
+test("makeListingDraft returns ASCII buyer-facing title and detail", () => {
+  const listing = makeListingDraft({
+    productName: "YSL Loveshine Candy Glow Son duong co mau",
+    notes: "duong moi bong nhe",
+    storeId: "9"
+  });
+
+  assert.ok(listing.title.length >= 80);
+  assert.ok(listing.title.length <= 100);
+  assert.equal(/[\u0100-\uFFFF]/.test(listing.title + listing.detail), false);
+  assert.equal(validateVietnameseListing(listing).valid, true);
+});
+
+test("makeListingDraft pads short product names to Shopee title length", () => {
+  const listing = makeListingDraft({
+    productName: "Demo Product Check",
+    notes: "demo only",
+    storeId: "7"
+  });
+
+  assert.ok(listing.title.length >= 80);
+  assert.ok(listing.title.length <= 100);
+});
+
+test("makeListingDraft never adds Shopee into buyer-facing copy", () => {
+  const listing = makeListingDraft({
+    productName: "Estee Lauder Soft Clean Infusion",
+    notes: "duong am, lam diu da, chai hong, phu hop da kho",
+    storeId: "8"
+  });
+
+  assert.equal(listing.title.includes("Shopee"), false);
+  assert.equal(listing.detail.includes("Shopee"), false);
+});
+
+test("makeListingDraft creates differentiated buyer copy for each store", () => {
+  const base = {
+    productName: "YSL Loveshine Candy Glow Tinted Lip Balm",
+    notes: "son duong co mau, bong nhe, duong am moi"
+  };
+  const store7 = makeListingDraft({ ...base, storeId: "7" });
+  const store8 = makeListingDraft({ ...base, storeId: "8" });
+  const store9 = makeListingDraft({ ...base, storeId: "9" });
+
+  assert.notEqual(store7.title, store8.title);
+  assert.notEqual(store8.title, store9.title);
+  assert.notEqual(store7.detail, store8.detail);
+  assert.notEqual(store8.detail, store9.detail);
+  assert.match(store7.detail, /moi/i);
+  assert.match(store7.detail, /bong/i);
+  assert.equal(validateVietnameseListing(store7).valid, true);
+  assert.equal(validateVietnameseListing(store8).valid, true);
+  assert.equal(validateVietnameseListing(store9).valid, true);
+});
+
+test("makeListingDraft makes ecommerce titles start with English identity and vary by benefit", () => {
+  const base = {
+    productName: "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml Sua Rua Mat 2in1 Lam Sach & Thanh Loc Da",
+    notes: "sua rua mat lam sach sau, thanh loc da, duong am, phu hop da dau"
+  };
+  const titles = ["7", "8", "9"].map((storeId) => makeListingDraft({ ...base, storeId }).title);
+  const identity = "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml";
+
+  for (const title of titles) {
+    assert.ok(title.startsWith(identity), title);
+    assert.ok(title.length >= 80, title);
+    assert.ok(title.length <= 100, title);
+    assert.match(title, /, /, title);
+    assert.equal(/\bShopee\b/i.test(title), false, title);
+    assert.equal(/\bchinh hang\b/i.test(title), false, title);
+    assert.equal(validateVietnameseListing({ title, detail: "Cong dung: lam sach diu nhe, ho tro da thong thoang, giup be mat da mem min va phu hop dung hang ngay." }).valid, true);
+  }
+  assert.equal(new Set(titles).size, 3, titles.join("\n"));
+  assert.match(titles[0], /Lam Sach Sau|Loai Bo Bui Ban|Mem Min/);
+  assert.match(titles[1], /Dau Thua|Thoang Mat|Can Bang/);
+  assert.match(titles[2], /Thanh Loc|Duong Am|Dung Hang Ngay/);
+});
+
+test("makeListingDraft creates compliant differentiated cleanser details", () => {
+  const base = {
+    productName: "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml Sua Rua Mat 2in1 Lam Sach & Thanh Loc Da",
+    notes: "sua rua mat lam sach sau, thanh loc da, duong am, phu hop da dau, khong chinh hang"
+  };
+  const store7 = makeListingDraft({ ...base, storeId: "7" });
+  const store8 = makeListingDraft({ ...base, storeId: "8" });
+  const store9 = makeListingDraft({ ...base, storeId: "9" });
+
+  const titles = [store7.title, store8.title, store9.title];
+  assert.equal(new Set(titles).size, 3, titles.join("\n"));
+  assert.match(store7.title, /Lam Sach Sau|Loai Bo Bui Ban|Mem Min/i);
+  assert.match(store8.title, /Dau Thua|Thoang Mat|Lo Chan Long|Vung T/i);
+  assert.match(store9.title, /Thanh Loc|Duong Am|Hang Ngay|Diu Nhe/i);
+
+  for (const listing of [store7, store8, store9]) {
+    assert.match(listing.detail, /^ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml/m);
+    assert.match(listing.detail, /Cong dung chinh/);
+    assert.match(listing.detail, /Doi tuong phu hop/);
+    assert.match(listing.detail, /Cam giac khi dung/);
+    assert.match(listing.detail, /Cach dung/);
+    assert.match(listing.detail, /Cach bao quan/);
+    assert.equal(/\b(?:FAQ|Q:|A:|Mat na rua|mat na rua|Thong tin tham khao|chinh hang|SKU|Shopee)\b/i.test(listing.detail), false);
+    assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|phien ban|khach thich)\b/i.test(listing.detail), false);
+    assert.equal(validateVietnameseListing(listing).valid, true);
+  }
+
+  assert.match(store8.detail, /dau thua|vung T|thoang mat/i);
+  assert.match(store9.detail, /duong am|khong bi cang kho|hang ngay/i);
+  assert.notEqual(store7.detail, store8.detail);
+  assert.notEqual(store8.detail, store9.detail);
+});
+
+test("makeListingDraft uses one buyer-copy standard with differentiated lower modules", () => {
+  const base = {
+    productName: "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml",
+    notes: "sua rua mat 2 trong 1, lam sach sau, dau thua, thanh loc lo chan long"
+  };
+  const listings = ["7", "8", "9"].map((storeId) => makeListingDraft({ ...base, storeId }));
+  const section = (detail, start, end) => detail.split(start)[1].split(end)[0].trim();
+
+  for (const listing of listings) {
+    assert.ok(listing.title.length >= 80 && listing.title.length <= 100, listing.title);
+    assert.ok(listing.title.startsWith("ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml"), listing.title);
+    assert.equal(/[^\x00-\x7F]/.test(listing.title + listing.detail), false);
+    assert.equal(/\b(?:Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(listing.title + listing.detail), false);
+    assert.equal(validateVietnameseListing(listing).valid, true);
+  }
+
+  for (const [start, end] of [
+    ["Cong dung chinh", "Doi tuong phu hop"],
+    ["Doi tuong phu hop", "Cam giac khi dung"],
+    ["Cam giac khi dung", "Cach dung"],
+    ["Cach dung", "Cach bao quan"]
+  ]) {
+    const modules = listings.map((listing) => section(listing.detail, start, end));
+    assert.equal(new Set(modules).size, 3, `${start} should differ per store`);
+  }
+});
+
+test("makeListingDraft changes the visible benefit section per store", () => {
+  const base = {
+    productName: "Estee Lauder Soft Clean Infusion Hydrating Lotion",
+    notes: "pink bottle, hydrating and soothing lotion, dry skin"
+  };
+  const store7 = makeListingDraft({ ...base, storeId: "7" });
+  const store8 = makeListingDraft({ ...base, storeId: "8" });
+  const store9 = makeListingDraft({ ...base, storeId: "9" });
+
+  const visibleBenefits = (detail) => detail.split("\n").slice(3, 7).join("\n");
+  assert.notEqual(visibleBenefits(store7.detail), visibleBenefits(store8.detail));
+  assert.notEqual(visibleBenefits(store8.detail), visibleBenefits(store9.detail));
+  assert.notEqual(visibleBenefits(store7.detail), visibleBenefits(store9.detail));
+});
+
+test("makeListingDraft differentiates lower detail modules per store", () => {
+  const base = {
+    productName: "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml",
+    notes: "sua rua mat 2 trong 1, lam sach sau, dau thua, thanh loc lo chan long"
+  };
+  const store7 = makeListingDraft({ ...base, storeId: "7" });
+  const store8 = makeListingDraft({ ...base, storeId: "8" });
+  const store9 = makeListingDraft({ ...base, storeId: "9" });
+  const moduleText = (detail, start, end) => detail.split(start)[1].split(end)[0].trim();
+
+  for (const section of [
+    ["Doi tuong phu hop", "Cam giac khi dung"],
+    ["Cam giac khi dung", "Cach dung"],
+    ["Cach dung", "Cach bao quan"]
+  ]) {
+    const texts = [store7, store8, store9].map((listing) => moduleText(listing.detail, section[0], section[1]));
+    assert.equal(new Set(texts).size, 3, `${section[0]} should differ per store`);
+  }
+});
+
+test("makeListingDraft differentiates cleanser storage and keeps all sections compliant", () => {
+  const base = {
+    productName: "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml",
+    notes: "sua rua mat 2 trong 1, lam sach sau, dau thua, thanh loc lo chan long"
+  };
+  const listings = ["7", "8", "9"].map((storeId) => makeListingDraft({ ...base, storeId }));
+  const storage = listings.map((listing) => listing.detail.split("Cach bao quan")[1].trim());
+
+  assert.equal(new Set(storage).size, 3, "Cach bao quan should differ per store");
+  assert.match(storage[0], /kho thoang|nguon nhiet/i);
+  assert.match(storage[1], /nhiet do phong|mieng nap/i);
+  assert.match(storage[2], /dung chieu|thoang mat/i);
+
+  for (const listing of listings) {
+    const copy = `${listing.title}\n${listing.detail}`;
+    assert.equal(/\b(?:FAQ|Q:|A:|Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(copy), false);
+    assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|phien ban|khach thich)\b/i.test(copy), false);
+    assert.equal(validateVietnameseListing(listing).valid, true);
+  }
+});
+
+test("makeListingDraft keeps non-cleanser details buyer-facing instead of internal layout copy", () => {
+  const listing = makeListingDraft({
+    productName: "Estee Lauder Soft Clean Infusion Hydrating Lotion",
+    notes: "pink bottle, hydrating and soothing lotion, dry skin",
+    storeId: "8"
+  });
+
+  assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|khach thich|phien ban)\b/i.test(listing.detail), false);
+  assert.match(listing.detail, /Cam giac khi dung/);
+  assert.match(listing.detail, /da|be mat/i);
+  assert.equal(validateVietnameseListing(listing).valid, true);
+});
+
+test("makeListingDraft keeps English brand and product name as identity", () => {
+  const listing = makeListingDraft({
+    productName: "[Chinh hang] Estee Lauder Soft Clean Infusion Nuoc hoa hong duong am 400ml",
+    skuGroup: ["YSLD80501"],
+    notes: "duong am, lam diu da, chai hong, phu hop da kho",
+    storeId: "8"
+  });
+
+  assert.match(listing.title, /Estee Lauder Soft Clean Infusion/i);
+  assert.match(listing.detail, /^Estee Lauder Soft Clean Infusion/m);
+  assert.equal(listing.title.includes("YSLD80501"), false);
+  assert.equal(listing.detail.includes("YSLD80501"), false);
+  assert.equal(validateVietnameseListing(listing).valid, true);
+});
+
+test("requireBuyerProductIdentity rejects SKU-only names before final buyer copy", () => {
+  assert.throws(() => requireBuyerProductIdentity({
+    productName: "YSLD80501 YSLD80502",
+    skuGroup: ["YSLD80501", "YSLD80502"]
+  }), /English brand and product name/);
+
+  assert.doesNotThrow(() => requireBuyerProductIdentity({
+    productName: "[Chinh hang] Estee Lauder Soft Clean Infusion Nuoc hoa hong duong am 400ml",
+    skuGroup: ["YSLD80501", "YSLD80502"]
+  }));
+});
+
+test("makeListingDraft can require English identity for final upload", () => {
+  assert.throws(() => makeListingDraft({
+    productName: "YSLD80501 YSLD80502",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    notes: "nuoc hoa hong duong am cho da kho, chai hong 400ml",
+    storeId: "9",
+    requireIdentity: true
+  }), /English brand and product name/);
+
+  const listing = makeListingDraft({
+    productName: "Estee Lauder Soft Clean Infusion",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    notes: "nuoc hoa hong duong am cho da kho, chai hong 400ml",
+    storeId: "9",
+    requireIdentity: true
+  });
+
+  assert.equal(listing.title.includes("YSLD80501"), false);
+  assert.equal(listing.detail.includes("YSLD80501"), false);
+  assert.match(listing.title, /Estee Lauder Soft Clean Infusion/i);
+  assert.match(listing.detail, /duong am|cham soc/i);
+  assert.equal(validateVietnameseListing(listing).valid, true);
+});
+
+test("makeListingDraft can fall back to an English buyer product name when source listing is missing", () => {
+  const listing = makeListingDraft({
+    productName: "YSLD80501 YSLD80502",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    notes: "pink bottle, hydrating and soothing lotion, dry skin",
+    storeId: "9",
+    requireIdentity: true,
+    allowFallbackIdentity: true
+  });
+
+  assert.match(listing.title, /HydraSoft Soothing Lotion/i);
+  assert.match(listing.detail, /^HydraSoft Soothing Lotion/m);
+  assert.equal(/\b(?:Premium|Product|Estee|Lauder|YSL|Lancome|Kerastase)\b/i.test(listing.title), false);
+  assert.equal(listing.title.includes("YSLD80501"), false);
+  assert.equal(listing.detail.includes("YSLD80501"), false);
+  assert.equal(validateVietnameseListing(listing).valid, true);
+});
+
+test("makeListingDraft produces five required buyer detail modules without SKU or platform text", () => {
+  const listing = makeListingDraft({
+    productName: "YSLD80501 YSLD80502",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    notes: "pink bottle, hydrating and soothing lotion, dry skin",
+    storeId: "8",
+    requireIdentity: true,
+    allowFallbackIdentity: true
+  });
+
+  assert.match(listing.detail, /^HydraSoft Soothing Lotion/m);
+  assert.match(listing.detail, /Cong dung/i);
+  assert.match(listing.detail, /Phu hop/i);
+  assert.match(listing.detail, /Cam giac/i);
+  assert.match(listing.detail, /Cach dung/i);
+  assert.match(listing.detail, /Bao quan/i);
+  assert.equal(/\b(?:SKU|Shopee|YSLD80501|YSLD80502)\b/i.test(listing.title + listing.detail), false);
+  assert.equal(/[^\x00-\x7F]/.test(listing.title + listing.detail), false);
+});
+
+test("validateVietnameseListing rejects platform words, SKU codes, Chinese, accents, and vague titles", () => {
+  const listing = {
+    title: "Premium Beauty Product cho Shopee san pham chinh hang cao cap duong am tot nhat hang ngay",
+    detail: "San pham nay co SKU YSLD80501 va noi dung 中文 co dau tieng Việt."
+  };
+
+  assert.deepEqual(validateVietnameseListing(listing).errors, [
+    "Title and detail must not contain Shopee.",
+    "Title and detail must not contain authenticity claims.",
+    "Title and detail must not contain SKU or full SKU codes.",
+    "Title and detail must use unaccented ASCII Vietnamese with no Chinese.",
+    "Title must not use vague generic beauty filler.",
+    "Detail is too short for buyer-facing product effects."
+  ]);
+});
+
+test("buildImage2Config can generate from text when no source images are available", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "YSLD80501 YSLD80502",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    targetStores: ["7", "8"],
+    sourceImages: [],
+    notes: "pink bottle, hydrating and soothing lotion, dry skin",
+    allowFallbackIdentity: true
+  });
+
+  assert.equal(config.jobs.length, 8);
+  assert.ok(config.jobs.every((job) => job.endpoint === "generations"));
+  assert.ok(config.jobs.every((job) => job.images.length === 0));
+  assert.ok(config.jobs[0].prompt.includes("HydraSoft Soothing Lotion"));
+});

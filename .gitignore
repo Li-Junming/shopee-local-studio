@@ -1,0 +1,41 @@
+# Dependencies
+**/node_modules/
+
+# Generated product data and local working files
+inputs/
+outputs/
+tmp/
+work/
+
+# Shopee Local Studio runtime data
+tools/shopee_local_studio/data/
+tools/shopee_local_studio/*.log
+tools/shopee_local_studio/server.out.log
+tools/shopee_local_studio/server.err.log
+
+# BigSeller historical task configs and screenshots
+tools/bigseller_draft_filler/jobs*.json
+!tools/bigseller_draft_filler/jobs.example.json
+tools/bigseller_draft_filler/sku-jobs*.json
+!tools/bigseller_draft_filler/sku-jobs.example.json
+tools/bigseller_draft_filler/*page_state*.png
+
+# Historical one-off product scripts
+tools/make_*_assets*.py
+tools/shopee_product_pipeline/
+
+# Python and Node caches
+**/__pycache__/
+**/*.pyc
+.npm/
+.cache/
+
+# Local secrets and machine-specific config
+.env
+.env.*
+*.local.json
+
+# Large binary archives
+*.zip
+*.7z
+*.rar

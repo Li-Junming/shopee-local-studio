@@ -1,0 +1,28 @@
+{
+  "browser": {
+    "userDataDir": ".chrome-profile",
+    "headless": false
+  },
+  "draftListUrl": "https://www.bigseller.pro/web/listing/shopee/index.htm?bsStatus=1",
+  "storeMap": [
+    {
+      "match": "姐夫 7店（胡）",
+      "folder": "store_7_skinora"
+    },
+    {
+      "match": "姐夫8店（胡）",
+      "folder": "store_8_skinora_beauty"
+    },
+    {
+      "match": "姐夫9店（胡）",
+      "folder": "store_9_elora_skin"
+    }
+  ],
+  "discoverJobs": [
+    {
+      "name": "Charlotte Tilbury Airbrush Flawless",
+      "skus": ["CT860101", "CT860102", "CT860103", "CT860104"],
+      "assetRoot": "C:/Users/12295/Documents/Codex/2026-07-16/ni/outputs/PASTE_PRODUCT_OUTPUT_FOLDER_HERE"
+    }
+  ]
+}
