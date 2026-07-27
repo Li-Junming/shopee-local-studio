@@ -223,7 +223,7 @@ function renderTaskSelect() {
   `;
   taskSelect.innerHTML = placeholder + tasks.map((task) => `
     <option value="${task.id}" ${task.id === selectedTask?.id ? "selected" : ""}>
-      ${task.archived ? "[\u5df2\u5f52\u6863] " : ""}${escapeHtml(task.productName)} &middot; ${escapeHtml(task.skuGroup.join(" "))} &middot; ${escapeHtml(task.status)}
+      ${task.archived ? "[\u5df2\u5f52\u6863] " : ""}${escapeHtml(task.productName)} &middot; ${escapeHtml(taskIdentifierText(task))} &middot; ${escapeHtml(task.status)}
     </option>
   `).join("");
 }
@@ -239,7 +239,7 @@ async function renderTask() {
   }
 
   document.querySelector("#taskProduct").textContent = displayTask.productName;
-  document.querySelector("#taskSkus").textContent = displayTask.skuGroup.join(" ");
+  document.querySelector("#taskSkus").textContent = taskIdentifierText(displayTask);
   document.querySelector("#taskStatus").textContent = displayTask.status;
   document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
   document.querySelector("#archiveBtn").textContent = displayTask.archived ? "\u53d6\u6d88\u5f52\u6863" : "\u5f52\u6863\u4efb\u52a1";
@@ -330,7 +330,7 @@ async function renderSourceReview(displayTask) {
       </div>
     </div>
     <div class="source-meta">
-      <div><span>\u5546\u54C1\u7F16\u7801/SKU</span><strong>${escapeHtml(displayTask.skuGroup.join(" "))}</strong></div>
+      <div><span>\u5546\u54C1\u7F16\u7801/SKU</span><strong>${escapeHtml(taskIdentifierText(displayTask))}</strong></div>
       <div><span>1\u5e97\u6807\u9898</span><strong>${escapeHtml(review.title || selectedTask.sourceTitle || "\u5c1a\u672a\u68c0\u7d22")}</strong></div>
       <div><span>\u7f16\u8f91\u94fe\u63a5</span>${review.editUrl ? `<a href="${escapeHtml(review.editUrl)}" target="_blank" rel="noreferrer">\u6253\u5f00 1\u5e97\u5546\u54c1</a>` : "<strong>\u6682\u65e0</strong>"}</div>
     </div>
@@ -363,6 +363,12 @@ function sourceRiskLabel(level) {
   if (level === "normal") return "\u666e\u901a\u5339\u914d";
   if (level === "high") return "\u9ad8\u98ce\u9669";
   return "\u672a\u68c0\u67e5";
+}
+
+function taskIdentifierText(task) {
+  const skuText = (task?.skuGroup || []).join(" ");
+  const productCodeText = (task?.productCodes || []).join(" ");
+  return productCodeText ? `${productCodeText} -> ${skuText}` : skuText;
 }
 
 function pendingDisplayTask() {

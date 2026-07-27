@@ -6,6 +6,7 @@ import {
   buildBigSellerSourceConfig,
   buildImage2CliArgs,
   buildImage2Config,
+  expandProductCodeSkuGroup,
   makeListingDraft,
   parseTaskText,
   parseSkuGroup,
@@ -95,6 +96,21 @@ test("parseTaskText accepts product code aliases as identifier input", () => {
   assert.deepEqual(parsed.targetStores, []);
 
   assert.deepEqual(parseTaskText("Product Code: ab123 cd456").skuGroup, ["AB123", "CD456"]);
+});
+
+test("expandProductCodeSkuGroup expands mapped product codes and preserves raw SKUs", () => {
+  const result = expandProductCodeSkuGroup("pc-001 raw-sku pc-002", {
+    "PC-001": ["sku-a", "sku-b"],
+    "PC-002": "sku-c sku-a"
+  });
+
+  assert.deepEqual(result.skuGroup, ["SKU-A", "SKU-B", "RAW-SKU", "SKU-C"]);
+  assert.deepEqual(result.productCodes, ["PC-001", "PC-002"]);
+  assert.deepEqual(result.mappings, [
+    { productCode: "PC-001", skus: ["SKU-A", "SKU-B"] },
+    { productCode: "PC-002", skus: ["SKU-C", "SKU-A"] }
+  ]);
+  assert.equal(result.expanded, true);
 });
 
 test("storesFor resolves supported target stores and rejects unknown stores", () => {
@@ -808,12 +824,14 @@ test("task management search matches product, SKU, status, and target store", ()
   const task = {
     productName: "Estee Lauder Soft Clean Infusion",
     skuGroup: ["YSLD80501", "YSLD80502"],
+    productCodes: ["PC805"],
     status: "pipeline_done",
     targetStores: ["7", "9"]
   };
 
   assert.equal(taskMatchesQuery(task, "soft clean"), true);
   assert.equal(taskMatchesQuery(task, "ysld80502"), true);
+  assert.equal(taskMatchesQuery(task, "pc805"), true);
   assert.equal(taskMatchesQuery(task, "pipeline_done"), true);
   assert.equal(taskMatchesQuery(task, "store:9"), true);
   assert.equal(taskMatchesQuery(task, "kerastase"), false);

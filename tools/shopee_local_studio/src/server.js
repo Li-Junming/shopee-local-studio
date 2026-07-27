@@ -12,6 +12,7 @@ import {
   buildImage2Config,
   buildPreflightReport,
   describeImage2Runtime,
+  expandProductCodeSkuGroup,
   makeListingDraft,
   normalizeSourceImages,
   parseTaskText,
@@ -34,6 +35,7 @@ const workspaceRoot = path.resolve(appRoot, "..", "..");
 const publicRoot = path.join(appRoot, "public");
 const dataRoot = path.join(appRoot, "data", "tasks");
 const uploadRoot = path.join(appRoot, "data", "uploads");
+const productCodeMapPath = process.env.PRODUCT_CODE_MAP_PATH || path.join(appRoot, "data", "product-code-map.json");
 const image2Cli = path.join(workspaceRoot, "tools", "image2_generator", "src", "cli.js");
 const bigSellerRun = path.join(workspaceRoot, "tools", "bigseller_draft_filler", "run.ps1");
 const LISTING_RULE_VERSION = 11;
@@ -62,7 +64,7 @@ async function route(req, res) {
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true });
   if (url.pathname === "/api/stores") return sendJson(res, 200, { stores: STORE_DEFINITIONS });
   if (url.pathname === "/api/store-frames") return sendJson(res, 200, await storeFrameStatus());
-  if (url.pathname === "/api/parse-task-text" && req.method === "POST") return sendJson(res, 200, { task: parseTaskText((await readJson(req)).text) });
+  if (url.pathname === "/api/parse-task-text" && req.method === "POST") return sendJson(res, 200, { task: await resolveParsedTaskIdentifiers(parseTaskText((await readJson(req)).text)) });
   if (url.pathname === "/api/uploads" && req.method === "POST") return sendJson(res, 201, { files: await saveUploadedImages(await readJson(req)) });
   if (url.pathname === "/api/tasks" && req.method === "GET") return sendJson(res, 200, { tasks: await listTasks({
     query: url.searchParams.get("q") || "",
@@ -100,7 +102,8 @@ async function route(req, res) {
 }
 
 async function createTask(body) {
-  const skuGroup = parseSkuGroup(body.skuGroup);
+  const skuResolution = await resolveSkuInput(body.skuGroup);
+  const skuGroup = skuResolution.skuGroup;
   const targetStores = storesFor(body.targetStores || []).map((store) => store.id);
   const sourceImages = normalizeSourceImages(body.sourceImages);
   const productName = body.productName?.trim() || skuGroup.join(" ");
@@ -120,6 +123,8 @@ async function createTask(body) {
     id,
     productName,
     skuGroup,
+    productCodes: skuResolution.productCodes,
+    productCodeMappings: skuResolution.mappings,
     targetStores,
     sourceImages,
     notes: body.notes || "",
@@ -144,7 +149,32 @@ async function createTask(body) {
   await fs.mkdir(task.paths.sourceImagesDir, { recursive: true });
   await saveTask(task);
   await appendLog(task, `Created task for ${task.productName}`);
+  if (skuResolution.expanded) {
+    await appendLog(task, `[product code map] ${skuResolution.mappings.map((item) => `${item.productCode} -> ${item.skus.join(", ")}`).join("; ")}`);
+  }
   return task;
+}
+
+async function resolveParsedTaskIdentifiers(task) {
+  const skuResolution = await resolveSkuInput(task.skuGroup);
+  return {
+    ...task,
+    skuGroup: skuResolution.skuGroup,
+    productCodes: skuResolution.productCodes,
+    productCodeMappings: skuResolution.mappings
+  };
+}
+
+async function resolveSkuInput(input) {
+  return expandProductCodeSkuGroup(input, await loadProductCodeMap());
+}
+
+async function loadProductCodeMap() {
+  const text = await fs.readFile(productCodeMapPath, "utf8").catch((error) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  return text ? JSON.parse(text) : {};
 }
 
 async function saveUploadedImages(body) {

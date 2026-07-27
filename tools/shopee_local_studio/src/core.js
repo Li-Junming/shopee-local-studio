@@ -71,6 +71,55 @@ export function parseSkuGroup(input) {
   return skus;
 }
 
+export function expandProductCodeSkuGroup(input, productCodeMap = {}) {
+  const identifiers = parseSkuGroup(input);
+  const normalizedMap = normalizeProductCodeMap(productCodeMap);
+  const skuGroup = [];
+  const productCodes = [];
+  const mappings = [];
+  const seen = new Set();
+
+  for (const identifier of identifiers) {
+    const mappedSkus = normalizedMap[identifier];
+    if (mappedSkus?.length) {
+      productCodes.push(identifier);
+      mappings.push({ productCode: identifier, skus: mappedSkus });
+      for (const sku of mappedSkus) addSku(sku);
+    } else {
+      addSku(identifier);
+    }
+  }
+
+  return {
+    skuGroup,
+    productCodes,
+    mappings,
+    expanded: mappings.length > 0
+  };
+
+  function addSku(sku) {
+    if (!seen.has(sku)) {
+      seen.add(sku);
+      skuGroup.push(sku);
+    }
+  }
+}
+
+function normalizeProductCodeMap(productCodeMap = {}) {
+  const entries = Array.isArray(productCodeMap)
+    ? productCodeMap.map((item) => [item?.code ?? item?.productCode, item?.skus ?? item?.skuGroup])
+    : Object.entries(productCodeMap || {});
+  const normalized = {};
+  for (const [rawCode, rawSkus] of entries) {
+    const code = parseSkuGroup([rawCode])[0];
+    const skus = parseSkuGroup(typeof rawSkus === "object" && !Array.isArray(rawSkus)
+      ? rawSkus?.skus ?? rawSkus?.skuGroup
+      : rawSkus);
+    if (code && skus.length) normalized[code] = skus;
+  }
+  return normalized;
+}
+
 export function storesFor(ids) {
   const normalized = Array.isArray(ids)
     ? ids.map(String)
@@ -214,6 +263,8 @@ export function taskMatchesQuery(task, query = "") {
     task?.productName,
     task?.status,
     ...(Array.isArray(task?.skuGroup) ? task.skuGroup : []),
+    ...(Array.isArray(task?.productCodes) ? task.productCodes : []),
+    ...(Array.isArray(task?.productCodeMappings) ? task.productCodeMappings.flatMap((item) => [item.productCode, ...(item.skus || [])]) : []),
     ...(Array.isArray(task?.targetStores) ? task.targetStores.map((storeId) => `store:${storeId}`) : [])
   ].filter(Boolean).join(" ").toLowerCase();
   return terms.every((term) => searchable.includes(term));
