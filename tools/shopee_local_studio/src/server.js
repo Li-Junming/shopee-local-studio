@@ -21,6 +21,7 @@ import {
   storesFor,
   validateVietnameseListing
 } from "./core.js";
+import { resolveStoreFrameAssets } from "./storeFrames.js";
 import { createZipBuffer } from "./zip.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +57,7 @@ async function route(req, res) {
 
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true });
   if (url.pathname === "/api/stores") return sendJson(res, 200, { stores: STORE_DEFINITIONS });
+  if (url.pathname === "/api/store-frames") return sendJson(res, 200, await storeFrameStatus());
   if (url.pathname === "/api/parse-task-text" && req.method === "POST") return sendJson(res, 200, { task: parseTaskText((await readJson(req)).text) });
   if (url.pathname === "/api/uploads" && req.method === "POST") return sendJson(res, 201, { files: await saveUploadedImages(await readJson(req)) });
   if (url.pathname === "/api/tasks" && req.method === "GET") return sendJson(res, 200, { tasks: await listTasks({
@@ -247,12 +249,17 @@ function ensureSourceTaskPaths(task) {
 
 async function writeImage2Config(task) {
   task = await ensureSourceImages(task);
+  const frameStatus = await storeFrameStatus(task.targetStores);
+  task.storeFrameRoot = frameStatus.root;
+  task.storeFrames = frameStatus.frames;
+  task.storeFrameMissing = frameStatus.missing;
   const config = buildImage2Config({
     taskDir: task.paths.taskDir,
     productName: task.productName,
     skuGroup: task.skuGroup,
     targetStores: task.targetStores,
     sourceImages: task.sourceImages,
+    storeFrames: task.storeFrames,
     notes: task.notes,
     allowFallbackIdentity: Boolean(task.sourceFallback)
   });
@@ -261,6 +268,10 @@ async function writeImage2Config(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `Wrote image2 config: ${task.paths.image2Config}`);
+  await appendLog(task, `[store frames] matched ${Object.keys(task.storeFrames || {}).join(", ") || "none"} from ${task.storeFrameRoot}`);
+  if (task.storeFrameMissing?.length) {
+    await appendLog(task, `[store frames] missing ${task.storeFrameMissing.join(", ")}; generation will continue without those frame references.`);
+  }
   return task;
 }
 
@@ -553,6 +564,10 @@ async function updateStatus(task, status) {
   task.status = status;
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
+}
+
+async function storeFrameStatus(storeIds = STORE_DEFINITIONS.map((store) => store.id)) {
+  return resolveStoreFrameAssets({ storeIds: storesFor(storeIds).map((store) => store.id) });
 }
 
 async function listTasks(options = {}) {

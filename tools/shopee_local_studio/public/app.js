@@ -2,6 +2,7 @@ let stores = [];
 let tasks = [];
 let selectedTask = null;
 let pendingParsedTask = null;
+let storeFrameStatus = null;
 
 const taskForm = document.querySelector("#taskForm");
 const storeChecks = document.querySelector("#storeChecks");
@@ -173,8 +174,12 @@ function fillTaskForm(task) {
 }
 
 async function refreshAll() {
-  const storeData = await api("/api/stores");
+  const [storeData, frameData] = await Promise.all([
+    api("/api/stores"),
+    api("/api/store-frames").catch(() => null)
+  ]);
   stores = storeData.stores;
+  storeFrameStatus = frameData;
   renderStores();
   await refreshTasks(selectedTask?.id ?? (pendingParsedTask ? null : undefined));
 }
@@ -238,6 +243,7 @@ async function renderTask() {
   document.querySelector("#taskStatus").textContent = displayTask.status;
   document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
   document.querySelector("#archiveBtn").textContent = displayTask.archived ? "\u53d6\u6d88\u5f52\u6863" : "\u5f52\u6863\u4efb\u52a1";
+  renderStoreFrameStatus(displayTask);
   renderListings(displayTask);
   if (selectedTask) {
     await loadImages();
@@ -270,6 +276,30 @@ function setTaskActionButtonsDisabled(disabled) {
     const button = document.querySelector(`#${id}`);
     if (button) button.disabled = disabled;
   });
+}
+
+function renderStoreFrameStatus(displayTask) {
+  const statusEl = document.querySelector("#storeFrameStatus");
+  if (!statusEl) return;
+  const targetStores = displayTask.targetStores || [];
+  if (!storeFrameStatus) {
+    statusEl.innerHTML = '<span class="frame-pill missing">\u6c34\u5370\u72b6\u6001\u672a\u8bfb\u53d6</span>';
+    return;
+  }
+  const currentTaskFrames = selectedTask?.storeFrames || {};
+  const frames = storeFrameStatus.frames || {};
+  const pills = targetStores.map((storeId) => {
+    const store = stores.find((item) => item.id === String(storeId));
+    const frame = currentTaskFrames[storeId] || frames[storeId];
+    const fileName = frame?.fileName || frame?.path?.split(/[\\/]/).pop();
+    return frame
+      ? `<span class="frame-pill ok">${escapeHtml(store?.label || storeId)}: ${escapeHtml(fileName || "\u5df2\u5339\u914d")}</span>`
+      : `<span class="frame-pill missing">${escapeHtml(store?.label || storeId)}: \u672a\u627e\u5230\u6c34\u5370</span>`;
+  });
+  statusEl.innerHTML = `
+    <div class="frame-root">\u6c34\u5370\u76ee\u5f55: ${escapeHtml(storeFrameStatus.root || "")}</div>
+    <div class="frame-pills">${pills.join("")}</div>
+  `;
 }
 
 function renderListings(displayTask = selectedTask) {

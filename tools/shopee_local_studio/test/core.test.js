@@ -136,6 +136,29 @@ test("describeImage2Runtime reports missing key and local proxy settings", async
   assert.equal(describeImage2Runtime({ OPENAI_API_KEY: "x" }).apiKeySet, true);
 });
 
+test("buildImage2Config appends each target store frame only to that store jobs", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Estee Lauder Soft Clean Infusion",
+    skuGroup: ["YSLD80501"],
+    targetStores: ["7", "9"],
+    sourceImages: ["C:/images/main.png"],
+    storeFrames: {
+      7: "C:/frames/store-7-watermark.png",
+      9: "C:/frames/store-9-watermark.png"
+    }
+  });
+
+  const store7Jobs = config.jobs.filter((job) => job.out.startsWith("store_7_skinora/"));
+  const store9Jobs = config.jobs.filter((job) => job.out.startsWith("store_9_elora_skin/"));
+
+  assert.ok(store7Jobs.every((job) => job.images.includes("C:/frames/store-7-watermark.png")));
+  assert.ok(store7Jobs.every((job) => !job.images.includes("C:/frames/store-9-watermark.png")));
+  assert.ok(store9Jobs.every((job) => job.images.includes("C:/frames/store-9-watermark.png")));
+  assert.ok(store9Jobs.every((job) => !job.images.includes("C:/frames/store-7-watermark.png")));
+  assert.ok(config.jobs[0].prompt.includes("target store watermark/frame reference"));
+});
+
 test("buildBigSellerSkuConfig writes discover jobs using asset root", () => {
   const assetRoot = path.resolve("outputs/local_studio/abc");
   const config = buildBigSellerSkuConfig({

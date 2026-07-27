@@ -140,6 +140,7 @@ export function normalizeSourceImages(imagePaths) {
 export function buildImage2Config(task) {
   const stores = storesFor(task.targetStores);
   const sourceImages = task.sourceImages || [];
+  const storeFrames = task.storeFrames || {};
   const hasSourceImages = sourceImages.length > 0;
   if (!hasSourceImages && !task.allowFallbackIdentity) {
     throw new Error("At least one source image path is required.");
@@ -168,17 +169,34 @@ export function buildImage2Config(task) {
     quality: task.quality || "low",
     concurrency: Number(task.concurrency || 1),
     outputDir: path.join(task.taskDir, "images"),
-    jobs: jobs.map((job) => ({ ...job, images: sourceImages }))
+    jobs
   };
 
   function makeJob(store, fileName, prompt) {
+    const framePath = storeFramePath(storeFrames, store.id);
+    const images = framePath ? [...sourceImages, framePath] : sourceImages;
     return {
       name: `${store.folder}_${fileName.replace(".png", "")}`,
       out: `${store.folder}/${fileName}`,
-      endpoint: hasSourceImages ? "edits" : "generations",
-      prompt
+      endpoint: images.length > 0 ? "edits" : "generations",
+      prompt: framePath ? addStoreFramePrompt(prompt) : prompt,
+      images
     };
   }
+}
+
+function storeFramePath(storeFrames, storeId) {
+  const value = storeFrames?.[storeId];
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value.path || "";
+}
+
+function addStoreFramePrompt(prompt) {
+  return [
+    prompt,
+    "Use the target store watermark/frame reference as this store's visual identity, border treatment, and layout cue while keeping the product packaging accurate."
+  ].join(" ");
 }
 
 export function buildImage2CliArgs({ cliPath, configPath, overwrite = false }) {
@@ -1545,7 +1563,7 @@ function realPhotoPrompt(task, store, variant) {
     variant === 1
       ? "Scene: handheld or vanity tabletop photo in natural indoor light."
       : "Scene: casual home desk or bathroom counter photo with a different angle and background.",
-    "No store frame, watermark, poster text, authenticity badge, or SKU."
+    "Keep the scene natural and avoid poster text, authenticity badge, SKU, or unrelated watermark."
   ].join(" ");
 }
 
