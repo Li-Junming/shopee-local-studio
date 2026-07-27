@@ -27,6 +27,11 @@ powershell -ExecutionPolicy Bypass -File .\run.ps1 -Config .\jobs.image2.example
 ```
 
 The tool writes PNG files and normalizes them to `800x800`.
+Existing non-empty output files are skipped by default. To regenerate and overwrite them:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run.ps1 -Config .\jobs.image2.example.json -Overwrite
+```
 
 ## Config Shape
 

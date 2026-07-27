@@ -1,6 +1,7 @@
 param(
   [string]$Config = "jobs.image2.example.json",
   [switch]$DryRun,
+  [switch]$Overwrite,
   [string]$BaseUrl = "",
   [int]$Concurrency = 0
 )
@@ -10,6 +11,7 @@ Set-Location $PSScriptRoot
 
 $argsList = @("src/cli.js", "--config", $Config)
 if ($DryRun) { $argsList += "--dry-run" }
+if ($Overwrite) { $argsList += "--overwrite" }
 if ($BaseUrl) { $argsList += @("--base-url", $BaseUrl) }
 if ($Concurrency -gt 0) { $argsList += @("--concurrency", "$Concurrency") }
 

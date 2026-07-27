@@ -181,6 +181,12 @@ export function buildImage2Config(task) {
   }
 }
 
+export function buildImage2CliArgs({ cliPath, configPath, overwrite = false }) {
+  const args = [cliPath, "--config", configPath];
+  if (overwrite) args.push("--overwrite");
+  return args;
+}
+
 export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targetStores }) {
   return {
     storeMap: buildBigSellerStoreMap(targetStores),

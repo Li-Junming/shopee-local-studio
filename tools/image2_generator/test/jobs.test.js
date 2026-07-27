@@ -10,6 +10,14 @@ test("skips existing non-empty image output files", async () => {
   assert.equal(await shouldSkipJobOutput("out.png", fsImpl), true);
 });
 
+test("does not skip existing image output files when overwrite is enabled", async () => {
+  const fsImpl = {
+    stat: async () => ({ isFile: () => true, size: 12 })
+  };
+
+  assert.equal(await shouldSkipJobOutput("out.png", fsImpl, { overwrite: true }), false);
+});
+
 test("does not skip missing or empty image output files", async () => {
   const missingFs = {
     stat: async () => {

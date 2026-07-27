@@ -24,6 +24,7 @@ document.querySelector("#reloadLogsBtn").addEventListener("click", loadLogs);
 document.querySelector("#runAllBtn").addEventListener("click", () => postTaskAction("run-all"));
 document.querySelector("#writeImageConfigBtn").addEventListener("click", () => postTaskAction("image2-config"));
 document.querySelector("#generateBtn").addEventListener("click", () => postTaskAction("generate"));
+document.querySelector("#regenerateImagesBtn").addEventListener("click", () => postTaskAction("regenerate-images"));
 document.querySelector("#writeBigsellerBtn").addEventListener("click", () => postTaskAction("bigseller-config"));
 document.querySelector("#discoverBtn").addEventListener("click", () => postTaskAction("discover"));
 document.querySelector("#saveBtn").addEventListener("click", () => postTaskAction("save"));
@@ -246,7 +247,7 @@ function pendingDisplayTask() {
 }
 
 function setTaskActionButtonsDisabled(disabled) {
-  ["runAllBtn", "writeImageConfigBtn", "generateBtn", "writeBigsellerBtn", "discoverBtn", "saveBtn", "regenerateListingsBtn", "saveListingsBtn", "reloadImagesBtn", "reloadLogsBtn"].forEach((id) => {
+  ["runAllBtn", "writeImageConfigBtn", "generateBtn", "regenerateImagesBtn", "writeBigsellerBtn", "discoverBtn", "saveBtn", "regenerateListingsBtn", "saveListingsBtn", "reloadImagesBtn", "reloadLogsBtn"].forEach((id) => {
     const button = document.querySelector(`#${id}`);
     if (button) button.disabled = disabled;
   });

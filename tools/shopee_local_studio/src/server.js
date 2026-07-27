@@ -8,6 +8,7 @@ import {
   STORE_DEFINITIONS,
   buildBigSellerSourceConfig,
   buildBigSellerSkuConfig,
+  buildImage2CliArgs,
   buildImage2Config,
   describeImage2Runtime,
   makeListingDraft,
@@ -64,6 +65,7 @@ async function route(req, res) {
     if (parts[3] === "regenerate-listings" && req.method === "POST") return sendJson(res, 200, { task: await regenerateListings(task) });
     if (parts[3] === "image2-config" && req.method === "POST") return sendJson(res, 200, { task: await writeImage2Config(task) });
     if (parts[3] === "generate" && req.method === "POST") return sendJson(res, 202, { task: await runImage2(task) });
+    if (parts[3] === "regenerate-images" && req.method === "POST") return sendJson(res, 202, { task: await runImage2(task, { overwrite: true }) });
     if (parts[3] === "bigseller-config" && req.method === "POST") return sendJson(res, 200, { task: await writeBigSellerConfig(task) });
     if (parts[3] === "discover" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerDiscover(task) });
     if (parts[3] === "save" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerSave(task) });
@@ -368,13 +370,17 @@ function productNameIsSkuOnly(task) {
   return !String(task.productName || "").trim() || String(task.productName || "").trim() === skuText;
 }
 
-async function runImage2(task) {
+async function runImage2(task, options = {}) {
   task = await ensureSourceImages(task);
   await assertImage2RuntimeReady(task);
   await writeImage2Config(task);
-  task.status = "generating_images";
+  task.status = options.overwrite ? "regenerating_images" : "generating_images";
   await saveTask(task);
-  runCommand(task, "image2", process.execPath, [image2Cli, "--config", task.paths.image2Config], appRoot);
+  runCommand(task, "image2", process.execPath, buildImage2CliArgs({
+    cliPath: image2Cli,
+    configPath: task.paths.image2Config,
+    overwrite: Boolean(options.overwrite)
+  }), appRoot);
   return task;
 }
 
@@ -421,7 +427,10 @@ async function runPipelineInBackground(taskId) {
     task = await ensureSourceImages(task);
     await assertImage2RuntimeReady(task);
     await writeImage2Config(task);
-    await runCommandAsync(task, "image2", process.execPath, [image2Cli, "--config", task.paths.image2Config], appRoot);
+    await runCommandAsync(task, "image2", process.execPath, buildImage2CliArgs({
+      cliPath: image2Cli,
+      configPath: task.paths.image2Config
+    }), appRoot);
 
     task = await readTask(taskId);
     await updateStatus(task, "pipeline_discovering_bigseller_drafts");

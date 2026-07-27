@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 
-export async function shouldSkipJobOutput(outputPath, fsImpl = fs) {
+export async function shouldSkipJobOutput(outputPath, fsImpl = fs, options = {}) {
+  if (options.overwrite) return false;
   try {
     const stat = await fsImpl.stat(outputPath);
     return stat.isFile() && stat.size > 0;

@@ -16,6 +16,7 @@ async function main() {
   if (args.baseUrl) raw.baseUrl = args.baseUrl;
   if (args.concurrency) raw.concurrency = Number(args.concurrency);
   const config = normalizeConfig(raw, args.config);
+  config.overwrite = Boolean(args.overwrite);
 
   if (args.dryRun) {
     printPlan(config);
@@ -28,9 +29,12 @@ async function main() {
   }
 
   await runPool(config.jobs, config.concurrency, async (job) => {
-    if (await shouldSkipJobOutput(job.outputPath)) {
+    if (await shouldSkipJobOutput(job.outputPath, undefined, { overwrite: args.overwrite })) {
       console.log(`[skip] ${job.outputPath}`);
       return;
+    }
+    if (args.overwrite) {
+      console.log(`[overwrite] ${job.outputPath}`);
     }
     console.log(`[image2] ${job.name} -> ${job.outputPath}`);
     const bytes = await callImageApi({ config, job, apiKey });
@@ -46,6 +50,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") out.help = true;
     else if (arg === "--dry-run") out.dryRun = true;
+    else if (arg === "--overwrite") out.overwrite = true;
     else if (arg === "--config") out.config = argv[++i];
     else if (arg === "--api-key") out.apiKey = argv[++i];
     else if (arg === "--base-url") out.baseUrl = argv[++i];
@@ -62,6 +67,7 @@ function printPlan(config) {
     size: config.size,
     outputSize: config.outputSize,
     concurrency: config.concurrency,
+    overwrite: Boolean(config.overwrite),
     jobs: config.jobs.map((job) => ({
       name: job.name,
       endpoint: job.endpoint,
@@ -85,6 +91,7 @@ Options:
   --base-url <url>     Override API base URL
   --api-key <key>      Override API key
   --concurrency <n>    Override concurrent API calls
+  --overwrite          Regenerate outputs even when PNG files already exist
 `);
 }
 

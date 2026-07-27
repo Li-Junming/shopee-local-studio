@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   buildBigSellerSkuConfig,
   buildBigSellerSourceConfig,
+  buildImage2CliArgs,
   buildImage2Config,
   makeListingDraft,
   parseTaskText,
@@ -539,4 +540,26 @@ test("buildImage2Config can generate from text when no source images are availab
   assert.ok(config.jobs.every((job) => job.endpoint === "generations"));
   assert.ok(config.jobs.every((job) => job.images.length === 0));
   assert.ok(config.jobs[0].prompt.includes("HydraSoft Soothing Lotion"));
+});
+
+test("buildImage2CliArgs adds overwrite only when requested", () => {
+  assert.deepEqual(buildImage2CliArgs({
+    cliPath: "C:/tools/image2/src/cli.js",
+    configPath: "C:/tmp/image2.jobs.json"
+  }), [
+    "C:/tools/image2/src/cli.js",
+    "--config",
+    "C:/tmp/image2.jobs.json"
+  ]);
+
+  assert.deepEqual(buildImage2CliArgs({
+    cliPath: "C:/tools/image2/src/cli.js",
+    configPath: "C:/tmp/image2.jobs.json",
+    overwrite: true
+  }), [
+    "C:/tools/image2/src/cli.js",
+    "--config",
+    "C:/tmp/image2.jobs.json",
+    "--overwrite"
+  ]);
 });
