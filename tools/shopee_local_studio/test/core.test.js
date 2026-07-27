@@ -6,6 +6,7 @@ import {
   buildBigSellerSourceConfig,
   buildImage2CliArgs,
   buildImage2Config,
+  buildImageResultSummary,
   expandProductCodeSkuGroup,
   listProductCodeMappings,
   makeListingDraft,
@@ -617,6 +618,41 @@ test("buildImage2Config can generate from text when no source images are availab
   assert.ok(config.jobs.every((job) => job.endpoint === "generations"));
   assert.ok(config.jobs.every((job) => job.images.length === 0));
   assert.ok(config.jobs[0].prompt.includes("HydraSoft Soothing Lotion"));
+});
+
+test("buildImageResultSummary counts images by store and keeps first previews", () => {
+  const summary = buildImageResultSummary({
+    id: "task-001",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["SKU-A", "SKU-B"],
+    productCodes: ["PC001"],
+    targetStores: ["7", "9"],
+    status: "image2_done",
+    archived: false,
+    createdAt: "2026-07-27T10:00:00.000Z",
+    updatedAt: "2026-07-27T11:00:00.000Z"
+  }, [
+    { store: "7", storeLabel: "Store 7", file: "store_7/01.png", url: "/image/1" },
+    { store: "7", storeLabel: "Store 7", file: "store_7/02.png", url: "/image/2" },
+    { store: "9", storeLabel: "Store 9", file: "store_9/01.png", url: "/image/3" },
+    { store: "9", storeLabel: "Store 9", file: "store_9/02.png", url: "/image/4" },
+    { store: "9", storeLabel: "Store 9", file: "store_9/03.png", url: "/image/5" }
+  ]);
+
+  assert.equal(summary.id, "task-001");
+  assert.equal(summary.identifierText, "PC001 -> SKU-A SKU-B");
+  assert.equal(summary.imageCount, 5);
+  assert.deepEqual(summary.storeImageCounts, [
+    { store: "7", storeLabel: "Store 7", count: 2 },
+    { store: "9", storeLabel: "Store 9", count: 3 }
+  ]);
+  assert.deepEqual(summary.previewImages.map((image) => image.file), [
+    "store_7/01.png",
+    "store_7/02.png",
+    "store_9/01.png",
+    "store_9/02.png"
+  ]);
+  assert.equal(summary.downloadUrl, "/api/tasks/task-001/download");
 });
 
 test("buildImage2CliArgs adds overwrite only when requested", () => {

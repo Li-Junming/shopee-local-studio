@@ -4,6 +4,7 @@ let selectedTask = null;
 let pendingParsedTask = null;
 let storeFrameStatus = null;
 let productCodeMappings = [];
+let imageResults = [];
 
 const taskForm = document.querySelector("#taskForm");
 const productCodeMapForm = document.querySelector("#productCodeMapForm");
@@ -21,12 +22,16 @@ const imagePicker = document.querySelector("#imagePicker");
 const pickImagesBtn = document.querySelector("#pickImagesBtn");
 const imageDropZone = document.querySelector("#imageDropZone");
 const productCodeMapList = document.querySelector("#productCodeMapList");
+const imageResultSearch = document.querySelector("#imageResultSearch");
+const showArchivedResults = document.querySelector("#showArchivedResults");
+const imageResultsEl = document.querySelector("#imageResults");
 
 document.querySelector("#refreshBtn").addEventListener("click", refreshAll);
 document.querySelector("#parseQuickBtn").addEventListener("click", parseQuickTask);
 document.querySelector("#createRunBtn").addEventListener("click", createAndRunTask);
 document.querySelector("#reloadProductCodeMapBtn").addEventListener("click", loadProductCodeMap);
 document.querySelector("#deleteProductCodeMapBtn").addEventListener("click", deleteProductCodeMap);
+document.querySelector("#reloadImageResultsBtn").addEventListener("click", () => loadImageResults(true));
 document.querySelector("#reloadImagesBtn").addEventListener("click", loadImages);
 document.querySelector("#reloadLogsBtn").addEventListener("click", loadLogs);
 document.querySelector("#runAllBtn").addEventListener("click", () => postTaskAction("run-all"));
@@ -68,6 +73,8 @@ taskSelect.addEventListener("change", async () => {
 });
 taskSearch.addEventListener("input", async () => refreshTasks(selectedTask?.id, false));
 showArchived.addEventListener("change", async () => refreshTasks(selectedTask?.id, false));
+imageResultSearch.addEventListener("input", () => loadImageResults(false));
+showArchivedResults.addEventListener("change", () => loadImageResults(false));
 
 taskForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -84,6 +91,7 @@ setInterval(async () => {
     await refreshTasks(selectedTask.id, false);
     await loadLogs();
     await loadImages();
+    await loadImageResults(false);
   }
 }, 5000);
 
@@ -194,6 +202,7 @@ async function refreshAll() {
   renderStores();
   renderProductCodeMap();
   await refreshTasks(selectedTask?.id ?? (pendingParsedTask ? null : undefined));
+  await loadImageResults(false);
 }
 
 async function refreshTasks(preferredId, notify = true) {
@@ -207,6 +216,18 @@ async function refreshTasks(preferredId, notify = true) {
   renderTaskSelect();
   await renderTask();
   if (notify) toast("\u5df2\u5237\u65b0");
+}
+
+async function loadImageResults(notify = false) {
+  const params = new URLSearchParams();
+  const query = imageResultSearch.value.trim();
+  if (query) params.set("q", query);
+  if (showArchivedResults.checked) params.set("includeArchived", "1");
+  const suffix = params.toString();
+  const data = await api(`/api/image-results${suffix ? `?${suffix}` : ""}`);
+  imageResults = data.results || [];
+  renderImageResults();
+  if (notify) toast("\u56fe\u7247\u7ed3\u679c\u5df2\u5237\u65b0");
 }
 
 function taskListUrl() {
@@ -285,6 +306,42 @@ function renderTaskSelect() {
       ${task.archived ? "[\u5df2\u5f52\u6863] " : ""}${escapeHtml(task.productName)} &middot; ${escapeHtml(taskIdentifierText(task))} &middot; ${escapeHtml(task.status)}
     </option>
   `).join("");
+}
+
+function renderImageResults() {
+  if (!imageResultsEl) return;
+  if (!imageResults.length) {
+    imageResultsEl.innerHTML = '<div class="empty small">\u6682\u65e0\u751f\u6210\u56fe\u7ed3\u679c</div>';
+    return;
+  }
+  imageResultsEl.innerHTML = imageResults.map((result) => `
+    <article class="result-card" data-task-id="${escapeHtml(result.id)}">
+      <div class="result-main">
+        <div>
+          <strong>${escapeHtml(result.productName || result.identifierText)}</strong>
+          <span>${escapeHtml(result.identifierText)} &middot; ${escapeHtml(result.status)} &middot; ${escapeHtml(formatDateTime(result.updatedAt || result.createdAt))}</span>
+        </div>
+        <div class="result-actions">
+          <button type="button" data-action="select">\u6253\u5f00</button>
+          <button type="button" data-action="download">\u4e0b\u8f7d</button>
+          <button type="button" data-action="archive">${result.archived ? "\u6062\u590d" : "\u5f52\u6863"}</button>
+        </div>
+      </div>
+      <div class="result-counts">${(result.storeImageCounts || []).map((item) => `
+        <span>${escapeHtml(item.storeLabel || item.store)}: ${Number(item.count || 0)}</span>
+      `).join("")}</div>
+      <div class="result-previews">${(result.previewImages || []).map((image) => `
+        <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
+      `).join("")}</div>
+    </article>
+  `).join("");
+  imageResultsEl.querySelectorAll(".result-card").forEach((card) => {
+    card.querySelector("[data-action=select]")?.addEventListener("click", () => selectImageResultTask(card.dataset.taskId));
+    card.querySelector("[data-action=download]")?.addEventListener("click", () => {
+      window.location.href = `/api/tasks/${card.dataset.taskId}/download`;
+    });
+    card.querySelector("[data-action=archive]")?.addEventListener("click", () => archiveImageResultTask(card.dataset.taskId));
+  });
 }
 
 async function renderTask() {
@@ -531,6 +588,7 @@ async function postTaskAction(action, message = "\u5df2\u63d0\u4ea4\u540e\u53f0\
     const data = await api(`/api/tasks/${selectedTask.id}/${action}`, { method: "POST" });
     selectedTask = data.task;
     await refreshTasks(selectedTask.id, false);
+    await loadImageResults(false);
     toast(message);
   } catch (error) {
     toast(error.message);
@@ -543,7 +601,26 @@ async function archiveSelectedTask() {
   const data = await api(`/api/tasks/${selectedTask.id}/${action}`, { method: "POST" });
   selectedTask = data.task;
   await refreshTasks(selectedTask.id, false);
+  await loadImageResults(false);
   toast(action === "archive" ? "\u4efb\u52a1\u5df2\u5f52\u6863" : "\u4efb\u52a1\u5df2\u6062\u590d");
+}
+
+async function selectImageResultTask(taskId) {
+  const data = await api(`/api/tasks/${taskId}`);
+  if (data.task?.archived) showArchived.checked = true;
+  selectedTask = data.task;
+  pendingParsedTask = null;
+  await refreshTasks(taskId, false);
+}
+
+async function archiveImageResultTask(taskId) {
+  const result = imageResults.find((item) => item.id === taskId);
+  const action = result?.archived ? "unarchive" : "archive";
+  const data = await api(`/api/tasks/${taskId}/${action}`, { method: "POST" });
+  if (selectedTask?.id === taskId) selectedTask = data.task;
+  await refreshTasks(selectedTask?.id, false);
+  await loadImageResults(false);
+  toast(action === "archive" ? "\u7ed3\u679c\u5df2\u5f52\u6863" : "\u7ed3\u679c\u5df2\u6062\u590d");
 }
 
 async function deleteSelectedTask() {
@@ -554,6 +631,7 @@ async function deleteSelectedTask() {
   await api(`/api/tasks/${deletedId}`, { method: "DELETE" });
   selectedTask = null;
   await refreshTasks(undefined, false);
+  await loadImageResults(false);
   toast("\u4efb\u52a1\u5df2\u5220\u9664");
 }
 
@@ -602,6 +680,13 @@ function toast(message) {
   toastEl.timer = setTimeout(() => {
     toastEl.hidden = true;
   }, 2400);
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function escapeHtml(value) {

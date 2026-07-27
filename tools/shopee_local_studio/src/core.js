@@ -259,6 +259,38 @@ export function buildImage2Config(task) {
   }
 }
 
+export function buildImageResultSummary(task, images = []) {
+  const counts = new Map();
+  for (const image of images) {
+    const key = String(image.store || "");
+    const current = counts.get(key) || {
+      store: key,
+      storeLabel: image.storeLabel || key,
+      count: 0
+    };
+    current.count += 1;
+    counts.set(key, current);
+  }
+  const skuText = (Array.isArray(task?.skuGroup) ? task.skuGroup : []).join(" ");
+  const productCodeText = (Array.isArray(task?.productCodes) ? task.productCodes : []).join(" ");
+  return {
+    id: task?.id || "",
+    productName: task?.productName || "",
+    identifierText: productCodeText ? `${productCodeText} -> ${skuText}` : skuText,
+    skuGroup: Array.isArray(task?.skuGroup) ? task.skuGroup : [],
+    productCodes: Array.isArray(task?.productCodes) ? task.productCodes : [],
+    targetStores: Array.isArray(task?.targetStores) ? task.targetStores : [],
+    status: task?.status || "",
+    archived: Boolean(task?.archived),
+    createdAt: task?.createdAt || "",
+    updatedAt: task?.updatedAt || "",
+    imageCount: images.length,
+    storeImageCounts: [...counts.values()].sort((left, right) => left.store.localeCompare(right.store)),
+    previewImages: images.slice(0, 4),
+    downloadUrl: task?.id ? `/api/tasks/${task.id}/download` : ""
+  };
+}
+
 function storeFramePath(storeFrames, storeId) {
   const value = storeFrames?.[storeId];
   if (!value) return "";

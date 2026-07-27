@@ -10,6 +10,7 @@ import {
   buildBigSellerSkuConfig,
   buildImage2CliArgs,
   buildImage2Config,
+  buildImageResultSummary,
   buildPreflightReport,
   describeImage2Runtime,
   expandProductCodeSkuGroup,
@@ -72,6 +73,10 @@ async function route(req, res) {
   if (parts[0] === "api" && parts[1] === "product-code-map" && parts[2] && req.method === "DELETE") return sendJson(res, 200, await deleteProductCodeMapRoute(decodeURIComponent(parts[2])));
   if (url.pathname === "/api/parse-task-text" && req.method === "POST") return sendJson(res, 200, { task: await resolveParsedTaskIdentifiers(parseTaskText((await readJson(req)).text)) });
   if (url.pathname === "/api/uploads" && req.method === "POST") return sendJson(res, 201, { files: await saveUploadedImages(await readJson(req)) });
+  if (url.pathname === "/api/image-results" && req.method === "GET") return sendJson(res, 200, { results: await listImageResults({
+    query: url.searchParams.get("q") || "",
+    includeArchived: parseBoolean(url.searchParams.get("includeArchived"))
+  }) });
   if (url.pathname === "/api/tasks" && req.method === "GET") return sendJson(res, 200, { tasks: await listTasks({
     query: url.searchParams.get("q") || "",
     includeArchived: parseBoolean(url.searchParams.get("includeArchived"))
@@ -745,6 +750,18 @@ async function listTasks(options = {}) {
     tasks.push(task);
   }
   return tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+async function listImageResults(options = {}) {
+  const tasks = await listTasks({ ...options, includeArchived: true });
+  const results = [];
+  for (const task of tasks) {
+    if (!shouldShowTask(task, options)) continue;
+    const images = await listImages(task);
+    if (!images.length) continue;
+    results.push(buildImageResultSummary(task, images));
+  }
+  return results.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }
 
 async function readTask(id) {
