@@ -187,6 +187,25 @@ export function buildImage2CliArgs({ cliPath, configPath, overwrite = false }) {
   return args;
 }
 
+export function taskMatchesQuery(task, query = "") {
+  const rawQuery = String(query || "").trim().toLowerCase();
+  if (!rawQuery) return true;
+  const terms = rawQuery.split(/\s+/).filter(Boolean);
+  const searchable = [
+    task?.id,
+    task?.productName,
+    task?.status,
+    ...(Array.isArray(task?.skuGroup) ? task.skuGroup : []),
+    ...(Array.isArray(task?.targetStores) ? task.targetStores.map((storeId) => `store:${storeId}`) : [])
+  ].filter(Boolean).join(" ").toLowerCase();
+  return terms.every((term) => searchable.includes(term));
+}
+
+export function shouldShowTask(task, options = {}) {
+  if (!options.includeArchived && task?.archived) return false;
+  return taskMatchesQuery(task, options.query);
+}
+
 export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targetStores }) {
   return {
     storeMap: buildBigSellerStoreMap(targetStores),

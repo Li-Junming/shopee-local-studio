@@ -16,10 +16,12 @@ import {
   parseTaskText,
   parseSkuGroup,
   requireBuyerProductIdentity,
+  shouldShowTask,
   sourceImagesMissingMessage,
   storesFor,
   validateVietnameseListing
 } from "./core.js";
+import { createZipBuffer } from "./zip.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(__dirname, "..");
@@ -56,11 +58,18 @@ async function route(req, res) {
   if (url.pathname === "/api/stores") return sendJson(res, 200, { stores: STORE_DEFINITIONS });
   if (url.pathname === "/api/parse-task-text" && req.method === "POST") return sendJson(res, 200, { task: parseTaskText((await readJson(req)).text) });
   if (url.pathname === "/api/uploads" && req.method === "POST") return sendJson(res, 201, { files: await saveUploadedImages(await readJson(req)) });
-  if (url.pathname === "/api/tasks" && req.method === "GET") return sendJson(res, 200, { tasks: await listTasks() });
+  if (url.pathname === "/api/tasks" && req.method === "GET") return sendJson(res, 200, { tasks: await listTasks({
+    query: url.searchParams.get("q") || "",
+    includeArchived: parseBoolean(url.searchParams.get("includeArchived"))
+  }) });
   if (url.pathname === "/api/tasks" && req.method === "POST") return sendJson(res, 201, { task: await createTask(await readJson(req)) });
   if (parts[0] === "api" && parts[1] === "tasks" && parts[2]) {
     const task = await readTask(parts[2]);
     if (parts.length === 3 && req.method === "GET") return sendJson(res, 200, { task });
+    if (parts.length === 3 && req.method === "DELETE") return sendJson(res, 200, { ok: true, deletedTaskId: await deleteTask(task) });
+    if (parts[3] === "archive" && req.method === "POST") return sendJson(res, 200, { task: await setTaskArchived(task, true) });
+    if (parts[3] === "unarchive" && req.method === "POST") return sendJson(res, 200, { task: await setTaskArchived(task, false) });
+    if (parts[3] === "download" && req.method === "GET") return serveTaskDownload(res, task);
     if (parts[3] === "listings" && req.method === "PUT") return sendJson(res, 200, { task: await updateListings(task, await readJson(req)) });
     if (parts[3] === "regenerate-listings" && req.method === "POST") return sendJson(res, 200, { task: await regenerateListings(task) });
     if (parts[3] === "image2-config" && req.method === "POST") return sendJson(res, 200, { task: await writeImage2Config(task) });
@@ -546,13 +555,14 @@ async function updateStatus(task, status) {
   await saveTask(task);
 }
 
-async function listTasks() {
+async function listTasks(options = {}) {
   const entries = await fs.readdir(dataRoot, { withFileTypes: true }).catch(() => []);
   const tasks = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const task = await readTask(entry.name).catch(() => null);
     if (!task || task.productName === "Demo Product Check") continue;
+    if (!shouldShowTask(task, options)) continue;
     tasks.push(task);
   }
   return tasks.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -581,6 +591,22 @@ async function ensureListingRulesCurrent(task) {
 async function saveTask(task) {
   await fs.mkdir(task.paths.taskDir, { recursive: true });
   await fs.writeFile(path.join(task.paths.taskDir, "task.json"), `${JSON.stringify(task, null, 2)}\n`, "utf8");
+}
+
+async function setTaskArchived(task, archived) {
+  task.archived = Boolean(archived);
+  task.archivedAt = archived ? new Date().toISOString() : "";
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, archived ? "[task] Archived." : "[task] Unarchived.");
+  return task;
+}
+
+async function deleteTask(task) {
+  const taskDir = path.resolve(task.paths?.taskDir || path.join(dataRoot, task.id));
+  assertPathInside(taskDir, dataRoot, { allowRoot: false });
+  await fs.rm(taskDir, { recursive: true, force: true });
+  return task.id;
 }
 
 async function appendLog(task, text) {
@@ -618,6 +644,57 @@ async function serveTaskImage(res, task, file) {
   res.end(bytes);
 }
 
+async function serveTaskDownload(res, task) {
+  const entries = await taskDownloadEntries(task);
+  if (entries.length === 0) return sendText(res, 404, "No files to download");
+  const zip = createZipBuffer(entries);
+  res.writeHead(200, {
+    "Content-Type": "application/zip",
+    "Content-Disposition": `attachment; filename="${safeName(task.id)}.zip"`,
+    "Cache-Control": "no-store",
+    "Content-Length": zip.length
+  });
+  res.end(zip);
+}
+
+async function taskDownloadEntries(task) {
+  const entries = [];
+  const imagesDir = path.resolve(task.paths.imagesDir);
+  assertPathInside(imagesDir, task.paths.taskDir);
+  await collectDownloadFiles(imagesDir, imagesDir, entries);
+
+  for (const store of storesFor(task.targetStores)) {
+    const listing = task.listings?.[store.id];
+    if (!listing) continue;
+    entries.push({
+      name: `${store.folder}/listing.txt`,
+      data: Buffer.from([listing.title || "", "", listing.detail || ""].join("\n"), "utf8")
+    });
+  }
+
+  entries.push({
+    name: "task.json",
+    data: Buffer.from(`${JSON.stringify(task, null, 2)}\n`, "utf8")
+  });
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function collectDownloadFiles(root, dir, entries) {
+  const items = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const item of items) {
+    const itemPath = path.join(dir, item.name);
+    assertPathInside(itemPath, root);
+    if (item.isDirectory()) {
+      await collectDownloadFiles(root, itemPath, entries);
+      continue;
+    }
+    if (!item.isFile()) continue;
+    if (!/\.(png|jpe?g|webp|txt)$/i.test(item.name)) continue;
+    const relativeName = path.relative(root, itemPath).split(path.sep).join("/");
+    entries.push({ name: relativeName, data: await fs.readFile(itemPath) });
+  }
+}
+
 async function readJson(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -632,6 +709,19 @@ function sendJson(res, status, data) {
 function sendText(res, status, text) {
   res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
   res.end(text);
+}
+
+function parseBoolean(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+}
+
+function assertPathInside(target, root, options = {}) {
+  const targetPath = path.resolve(target);
+  const rootPath = path.resolve(root);
+  const isRoot = targetPath === rootPath;
+  if ((isRoot && !options.allowRoot) || (!isRoot && !targetPath.startsWith(`${rootPath}${path.sep}`))) {
+    throw new Error("Path is outside the allowed task data directory.");
+  }
 }
 
 function extensionForMime(mime) {

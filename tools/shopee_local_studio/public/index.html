@@ -64,7 +64,14 @@
       <section class="panel work-panel">
         <div class="section-head">
           <h2>&#20219;&#21153;</h2>
-          <select id="taskSelect"></select>
+          <div class="task-picker">
+            <input id="taskSearch" type="search" placeholder="&#25628;&#32034; SKU / &#20135;&#21697; / &#29366;&#24577; / store:9">
+            <label class="archive-toggle">
+              <input id="showArchived" type="checkbox">
+              &#26174;&#31034;&#24402;&#26723;
+            </label>
+            <select id="taskSelect"></select>
+          </div>
         </div>
 
         <div id="emptyState" class="empty">&#26242;&#26080;&#20219;&#21153;</div>
@@ -73,16 +80,20 @@
             <div><span>&#20135;&#21697;</span><strong id="taskProduct"></strong></div>
             <div><span>SKU</span><strong id="taskSkus"></strong></div>
             <div><span>&#29366;&#24577;</span><strong id="taskStatus"></strong></div>
+            <div><span>&#24402;&#26723;</span><strong id="taskArchived"></strong></div>
           </div>
 
           <div class="actions">
             <button id="runAllBtn" class="primary" type="button">&#19968;&#38190;&#20840;&#27969;&#31243;</button>
+            <button id="downloadTaskBtn" type="button">&#19979;&#36733;&#22270;&#29255;&#21253;</button>
+            <button id="archiveBtn" type="button">&#24402;&#26723;&#20219;&#21153;</button>
             <button id="writeImageConfigBtn" type="button">&#29983;&#25104;&#22270;&#29255;&#37197;&#32622;</button>
             <button id="generateBtn" type="button">&#29983;&#25104;&#22270;&#29255;</button>
             <button id="regenerateImagesBtn" type="button">&#37325;&#26032;&#29983;&#25104;&#22270;&#29255;</button>
             <button id="writeBigsellerBtn" type="button">&#29983;&#25104;&#33609;&#31295;&#37197;&#32622;</button>
             <button id="discoverBtn" type="button">&#26597;&#25214;&#33609;&#31295;</button>
             <button id="saveBtn" class="danger" type="button">&#20445;&#23384;&#33609;&#31295;</button>
+            <button id="deleteTaskBtn" class="danger" type="button">&#21024;&#38500;&#20219;&#21153;</button>
           </div>
 
           <div class="section-head">

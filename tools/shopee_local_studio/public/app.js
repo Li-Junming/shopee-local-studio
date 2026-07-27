@@ -6,6 +6,8 @@ let pendingParsedTask = null;
 const taskForm = document.querySelector("#taskForm");
 const storeChecks = document.querySelector("#storeChecks");
 const taskSelect = document.querySelector("#taskSelect");
+const taskSearch = document.querySelector("#taskSearch");
+const showArchived = document.querySelector("#showArchived");
 const taskView = document.querySelector("#taskView");
 const emptyState = document.querySelector("#emptyState");
 const listingEditors = document.querySelector("#listingEditors");
@@ -30,6 +32,9 @@ document.querySelector("#discoverBtn").addEventListener("click", () => postTaskA
 document.querySelector("#saveBtn").addEventListener("click", () => postTaskAction("save"));
 document.querySelector("#regenerateListingsBtn").addEventListener("click", () => postTaskAction("regenerate-listings"));
 document.querySelector("#saveListingsBtn").addEventListener("click", saveListings);
+document.querySelector("#archiveBtn").addEventListener("click", archiveSelectedTask);
+document.querySelector("#deleteTaskBtn").addEventListener("click", deleteSelectedTask);
+document.querySelector("#downloadTaskBtn").addEventListener("click", downloadSelectedTask);
 
 pickImagesBtn.addEventListener("click", () => imagePicker.click());
 imagePicker.addEventListener("change", async () => {
@@ -55,6 +60,8 @@ taskSelect.addEventListener("change", async () => {
   if (selectedTask) pendingParsedTask = null;
   await renderTask();
 });
+taskSearch.addEventListener("input", async () => refreshTasks(selectedTask?.id, false));
+showArchived.addEventListener("change", async () => refreshTasks(selectedTask?.id, false));
 
 taskForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -173,7 +180,7 @@ async function refreshAll() {
 }
 
 async function refreshTasks(preferredId, notify = true) {
-  const data = await api("/api/tasks");
+  const data = await api(taskListUrl());
   tasks = data.tasks;
   if (preferredId === null && pendingParsedTask && !selectedTask) {
     selectedTask = null;
@@ -183,6 +190,15 @@ async function refreshTasks(preferredId, notify = true) {
   renderTaskSelect();
   await renderTask();
   if (notify) toast("\u5df2\u5237\u65b0");
+}
+
+function taskListUrl() {
+  const params = new URLSearchParams();
+  const query = taskSearch.value.trim();
+  if (query) params.set("q", query);
+  if (showArchived.checked) params.set("includeArchived", "1");
+  const suffix = params.toString();
+  return `/api/tasks${suffix ? `?${suffix}` : ""}`;
 }
 
 function renderStores() {
@@ -202,7 +218,7 @@ function renderTaskSelect() {
   `;
   taskSelect.innerHTML = placeholder + tasks.map((task) => `
     <option value="${task.id}" ${task.id === selectedTask?.id ? "selected" : ""}>
-      ${escapeHtml(task.productName)} &middot; ${escapeHtml(task.skuGroup.join(" "))}
+      ${task.archived ? "[\u5df2\u5f52\u6863] " : ""}${escapeHtml(task.productName)} &middot; ${escapeHtml(task.skuGroup.join(" "))} &middot; ${escapeHtml(task.status)}
     </option>
   `).join("");
 }
@@ -220,6 +236,8 @@ async function renderTask() {
   document.querySelector("#taskProduct").textContent = displayTask.productName;
   document.querySelector("#taskSkus").textContent = displayTask.skuGroup.join(" ");
   document.querySelector("#taskStatus").textContent = displayTask.status;
+  document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
+  document.querySelector("#archiveBtn").textContent = displayTask.archived ? "\u53d6\u6d88\u5f52\u6863" : "\u5f52\u6863\u4efb\u52a1";
   renderListings(displayTask);
   if (selectedTask) {
     await loadImages();
@@ -238,6 +256,7 @@ function pendingDisplayTask() {
     productName: pendingParsedTask.productName || skuText || "\u5f85\u4ece 1 \u5e97\u6293\u53d6",
     skuGroup: pendingParsedTask.skuGroup || [],
     targetStores,
+    archived: false,
     status: "\u5f85\u521b\u5efa\uff0c\u5df2\u89e3\u6790",
     listings: Object.fromEntries(targetStores.map((storeId) => [storeId, {
       title: "\u521b\u5efa\u540e\u751f\u6210\u8be5\u5e97\u94fa\u7684 80-100 \u5b57\u7206\u6b3e\u6807\u9898",
@@ -247,7 +266,7 @@ function pendingDisplayTask() {
 }
 
 function setTaskActionButtonsDisabled(disabled) {
-  ["runAllBtn", "writeImageConfigBtn", "generateBtn", "regenerateImagesBtn", "writeBigsellerBtn", "discoverBtn", "saveBtn", "regenerateListingsBtn", "saveListingsBtn", "reloadImagesBtn", "reloadLogsBtn"].forEach((id) => {
+  ["runAllBtn", "downloadTaskBtn", "archiveBtn", "deleteTaskBtn", "writeImageConfigBtn", "generateBtn", "regenerateImagesBtn", "writeBigsellerBtn", "discoverBtn", "saveBtn", "regenerateListingsBtn", "saveListingsBtn", "reloadImagesBtn", "reloadLogsBtn"].forEach((id) => {
     const button = document.querySelector(`#${id}`);
     if (button) button.disabled = disabled;
   });
@@ -306,6 +325,31 @@ async function postTaskAction(action) {
   selectedTask = data.task;
   await refreshTasks(selectedTask.id, false);
   toast("\u5df2\u63d0\u4ea4\u540e\u53f0\u4efb\u52a1");
+}
+
+async function archiveSelectedTask() {
+  if (!selectedTask) return;
+  const action = selectedTask.archived ? "unarchive" : "archive";
+  const data = await api(`/api/tasks/${selectedTask.id}/${action}`, { method: "POST" });
+  selectedTask = data.task;
+  await refreshTasks(selectedTask.id, false);
+  toast(action === "archive" ? "\u4efb\u52a1\u5df2\u5f52\u6863" : "\u4efb\u52a1\u5df2\u6062\u590d");
+}
+
+async function deleteSelectedTask() {
+  if (!selectedTask) return;
+  const message = `\u786e\u5b9a\u5220\u9664\u4efb\u52a1\uff1a${selectedTask.productName}\uff1f\n\n\u8fd9\u4f1a\u5220\u9664\u8be5\u4efb\u52a1\u76ee\u5f55\u4e0b\u7684\u56fe\u7247\u3001\u6587\u6848\u548c\u65e5\u5fd7\u3002`;
+  if (!window.confirm(message)) return;
+  const deletedId = selectedTask.id;
+  await api(`/api/tasks/${deletedId}`, { method: "DELETE" });
+  selectedTask = null;
+  await refreshTasks(undefined, false);
+  toast("\u4efb\u52a1\u5df2\u5220\u9664");
+}
+
+function downloadSelectedTask() {
+  if (!selectedTask) return;
+  window.location.href = `/api/tasks/${selectedTask.id}/download`;
 }
 
 async function loadImages() {

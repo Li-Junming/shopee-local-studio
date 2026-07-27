@@ -10,8 +10,10 @@ import {
   parseTaskText,
   parseSkuGroup,
   requireBuyerProductIdentity,
+  shouldShowTask,
   sourceImagesMissingMessage,
   storesFor,
+  taskMatchesQuery,
   validateVietnameseListing
 } from "../src/core.js";
 
@@ -562,4 +564,30 @@ test("buildImage2CliArgs adds overwrite only when requested", () => {
     "C:/tmp/image2.jobs.json",
     "--overwrite"
   ]);
+});
+
+test("task management search matches product, SKU, status, and target store", () => {
+  const task = {
+    productName: "Estee Lauder Soft Clean Infusion",
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    status: "pipeline_done",
+    targetStores: ["7", "9"]
+  };
+
+  assert.equal(taskMatchesQuery(task, "soft clean"), true);
+  assert.equal(taskMatchesQuery(task, "ysld80502"), true);
+  assert.equal(taskMatchesQuery(task, "pipeline_done"), true);
+  assert.equal(taskMatchesQuery(task, "store:9"), true);
+  assert.equal(taskMatchesQuery(task, "kerastase"), false);
+  assert.equal(taskMatchesQuery(task, ""), true);
+});
+
+test("task management archive filter hides archived tasks by default", () => {
+  const activeTask = { productName: "Active", archived: false };
+  const archivedTask = { productName: "Archived", archived: true };
+
+  assert.equal(shouldShowTask(activeTask), true);
+  assert.equal(shouldShowTask(archivedTask), false);
+  assert.equal(shouldShowTask(archivedTask, { includeArchived: true }), true);
+  assert.equal(shouldShowTask(activeTask, { query: "missing" }), false);
 });

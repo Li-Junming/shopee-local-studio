@@ -205,9 +205,31 @@ button.danger {
   font-size: 16px;
 }
 
+.task-picker {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 1.2fr);
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 780px;
+}
+
+.archive-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  color: #374151;
+  font-weight: 700;
+}
+
+.archive-toggle input {
+  width: auto;
+}
+
 .summary-grid {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr;
+  grid-template-columns: 1.5fr 1fr 1fr .8fr;
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -340,5 +362,15 @@ button.danger {
 
   .listing-grid, .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-picker {
+    grid-template-columns: 1fr;
+    max-width: none;
   }
 }
