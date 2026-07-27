@@ -14,6 +14,21 @@ import {
   validateVietnameseListing
 } from "../src/core.js";
 
+const VIETNAMESE_DIACRITIC_RE = /[\u00C0-\u1EF9]/;
+
+function folded(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
+}
+
+function detailSection(detail, start, end) {
+  const foldedDetail = folded(detail);
+  return foldedDetail.split(start)[1].split(end)[0].trim();
+}
+
 test("parseSkuGroup normalizes whitespace and duplicate SKU values", () => {
   assert.deepEqual(parseSkuGroup("YSLD80501  YSLD80502\nYSLD80501"), [
     "YSLD80501",
@@ -153,9 +168,22 @@ test("sourceImagesMissingMessage explains missing BigSeller source SKU match", (
   assert.match(message, /paste\/upload source images/i);
 });
 
-test("validateVietnameseListing enforces title length and buyer-facing details", () => {
-  const title = "Estee Lauder Soft Clean Infusion nuoc hoa hong duong am lam diu da kho 400ml cao cap";
-  const detail = "Cong dung: Lam diu va cap am cho da kho, giup be mat da mem hon sau khi lam sach.";
+test("validateVietnameseListing enforces title length, diacritics, and buyer-facing details", () => {
+  const title = "Estee Lauder Soft Clean Infusion nước hoa hồng dưỡng ẩm làm dịu da khô 400ml cao cấp";
+  const detail = [
+    "Estee Lauder Soft Clean Infusion",
+    "Công dụng chính",
+    "- Dưỡng ẩm nhẹ nhàng, giúp bề mặt da mềm mịn hơn sau bước làm sạch.",
+    "- Làm dịu cảm giác khô căng, phù hợp dùng đều trong quy trình chăm sóc da.",
+    "Đối tượng phù hợp",
+    "- Phù hợp da khô, da thiếu ẩm hoặc người muốn sản phẩm dễ dùng mỗi ngày.",
+    "Cảm giác khi dùng",
+    "- Kết cấu nhẹ, thấm nhanh và không tạo cảm giác nặng mặt.",
+    "Cách dùng",
+    "- Dùng sau bước làm sạch, thoa đều lên da và tiếp tục kem dưỡng nếu cần.",
+    "Cách bảo quản",
+    "- Bảo quản nơi khô thoáng, tránh ánh nắng trực tiếp và đóng kín nắp sau khi dùng."
+  ].join("\n");
   assert.equal(validateVietnameseListing({ title, detail }).valid, true);
 
   assert.deepEqual(validateVietnameseListing({
@@ -164,11 +192,12 @@ test("validateVietnameseListing enforces title length and buyer-facing details",
   }).errors, [
     "Title must be 80-100 characters.",
     "Title and detail must not contain SKU or full SKU codes.",
+    "Title and detail must use Vietnamese with diacritics.",
     "Detail is too short for buyer-facing product effects."
   ]);
 });
 
-test("makeListingDraft returns ASCII buyer-facing title and detail", () => {
+test("makeListingDraft returns diacritic Vietnamese buyer-facing title and detail", () => {
   const listing = makeListingDraft({
     productName: "YSL Loveshine Candy Glow Son duong co mau",
     notes: "duong moi bong nhe",
@@ -177,7 +206,7 @@ test("makeListingDraft returns ASCII buyer-facing title and detail", () => {
 
   assert.ok(listing.title.length >= 80);
   assert.ok(listing.title.length <= 100);
-  assert.equal(/[\u0100-\uFFFF]/.test(listing.title + listing.detail), false);
+  assert.equal(VIETNAMESE_DIACRITIC_RE.test(listing.title + listing.detail), true);
   assert.equal(validateVietnameseListing(listing).valid, true);
 });
 
@@ -238,12 +267,28 @@ test("makeListingDraft makes ecommerce titles start with English identity and va
     assert.match(title, /, /, title);
     assert.equal(/\bShopee\b/i.test(title), false, title);
     assert.equal(/\bchinh hang\b/i.test(title), false, title);
-    assert.equal(validateVietnameseListing({ title, detail: "Cong dung: lam sach diu nhe, ho tro da thong thoang, giup be mat da mem min va phu hop dung hang ngay." }).valid, true);
+    assert.equal(validateVietnameseListing({
+      title,
+      detail: [
+        "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml",
+        "Công dụng chính",
+        "- Làm sạch dịu nhẹ, hỗ trợ da thông thoáng và giúp bề mặt da mềm mịn hơn.",
+        "- Phù hợp dùng hằng ngày trong quy trình chăm sóc da đơn giản tại nhà.",
+        "Đối tượng phù hợp",
+        "- Phù hợp da dầu, da hỗn hợp và người cần làm sạch sau khi ra ngoài.",
+        "Cảm giác khi dùng",
+        "- Tạo bọt mịn, dễ rửa sạch và không gây cảm giác khô căng.",
+        "Cách dùng",
+        "- Làm ướt mặt, tạo bọt rồi mát xa nhẹ nhàng trước khi rửa sạch.",
+        "Cách bảo quản",
+        "- Bảo quản nơi khô thoáng, tránh ánh nắng trực tiếp."
+      ].join("\n")
+    }).valid, true);
   }
   assert.equal(new Set(titles).size, 3, titles.join("\n"));
-  assert.match(titles[0], /Lam Sach Sau|Loai Bo Bui Ban|Mem Min/);
-  assert.match(titles[1], /Dau Thua|Thoang Mat|Can Bang/);
-  assert.match(titles[2], /Thanh Loc|Duong Am|Dung Hang Ngay/);
+  assert.match(folded(titles[0]), /Lam sach sau|Loai bo bui ban|mem min/i);
+  assert.match(folded(titles[1]), /dau thua|thoang mat|can bang/i);
+  assert.match(folded(titles[2]), /Thanh loc|duong am|hang ngay/i);
 });
 
 test("makeListingDraft creates compliant differentiated cleanser details", () => {
@@ -257,24 +302,24 @@ test("makeListingDraft creates compliant differentiated cleanser details", () =>
 
   const titles = [store7.title, store8.title, store9.title];
   assert.equal(new Set(titles).size, 3, titles.join("\n"));
-  assert.match(store7.title, /Lam Sach Sau|Loai Bo Bui Ban|Mem Min/i);
-  assert.match(store8.title, /Dau Thua|Thoang Mat|Lo Chan Long|Vung T/i);
-  assert.match(store9.title, /Thanh Loc|Duong Am|Hang Ngay|Diu Nhe/i);
+  assert.match(folded(store7.title), /Lam sach sau|Loai bo bui ban|mem min/i);
+  assert.match(folded(store8.title), /dau thua|thoang mat|lo chan long|vung T/i);
+  assert.match(folded(store9.title), /Thanh loc|duong am|hang ngay|diu nhe/i);
 
   for (const listing of [store7, store8, store9]) {
     assert.match(listing.detail, /^ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml/m);
-    assert.match(listing.detail, /Cong dung chinh/);
-    assert.match(listing.detail, /Doi tuong phu hop/);
-    assert.match(listing.detail, /Cam giac khi dung/);
-    assert.match(listing.detail, /Cach dung/);
-    assert.match(listing.detail, /Cach bao quan/);
-    assert.equal(/\b(?:FAQ|Q:|A:|Mat na rua|mat na rua|Thong tin tham khao|chinh hang|SKU|Shopee)\b/i.test(listing.detail), false);
-    assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|phien ban|khach thich)\b/i.test(listing.detail), false);
+    assert.match(listing.detail, /Công dụng chính/);
+    assert.match(listing.detail, /Đối tượng phù hợp/);
+    assert.match(listing.detail, /Cảm giác khi dùng/);
+    assert.match(listing.detail, /Cách dùng/);
+    assert.match(listing.detail, /Cách bảo quản/);
+    assert.equal(/\b(?:FAQ|Q:|A:|Mat na rua|mat na rua|Thong tin tham khao|chinh hang|SKU|Shopee)\b/i.test(folded(listing.detail)), false);
+    assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|phien ban|khach thich)\b/i.test(folded(listing.detail)), false);
     assert.equal(validateVietnameseListing(listing).valid, true);
   }
 
-  assert.match(store8.detail, /dau thua|vung T|thoang mat/i);
-  assert.match(store9.detail, /duong am|khong bi cang kho|hang ngay/i);
+  assert.match(folded(store8.detail), /dau thua|vung T|thoang mat/i);
+  assert.match(folded(store9.detail), /duong am|khong bi cang kho|hang ngay/i);
   assert.notEqual(store7.detail, store8.detail);
   assert.notEqual(store8.detail, store9.detail);
 });
@@ -285,13 +330,12 @@ test("makeListingDraft uses one buyer-copy standard with differentiated lower mo
     notes: "sua rua mat 2 trong 1, lam sach sau, dau thua, thanh loc lo chan long"
   };
   const listings = ["7", "8", "9"].map((storeId) => makeListingDraft({ ...base, storeId }));
-  const section = (detail, start, end) => detail.split(start)[1].split(end)[0].trim();
 
   for (const listing of listings) {
     assert.ok(listing.title.length >= 80 && listing.title.length <= 100, listing.title);
     assert.ok(listing.title.startsWith("ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml"), listing.title);
-    assert.equal(/[^\x00-\x7F]/.test(listing.title + listing.detail), false);
-    assert.equal(/\b(?:Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(listing.title + listing.detail), false);
+    assert.equal(VIETNAMESE_DIACRITIC_RE.test(listing.title + listing.detail), true);
+    assert.equal(/\b(?:Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(folded(listing.title + listing.detail)), false);
     assert.equal(validateVietnameseListing(listing).valid, true);
   }
 
@@ -301,7 +345,7 @@ test("makeListingDraft uses one buyer-copy standard with differentiated lower mo
     ["Cam giac khi dung", "Cach dung"],
     ["Cach dung", "Cach bao quan"]
   ]) {
-    const modules = listings.map((listing) => section(listing.detail, start, end));
+    const modules = listings.map((listing) => detailSection(listing.detail, start, end));
     assert.equal(new Set(modules).size, 3, `${start} should differ per store`);
   }
 });
@@ -329,14 +373,13 @@ test("makeListingDraft differentiates lower detail modules per store", () => {
   const store7 = makeListingDraft({ ...base, storeId: "7" });
   const store8 = makeListingDraft({ ...base, storeId: "8" });
   const store9 = makeListingDraft({ ...base, storeId: "9" });
-  const moduleText = (detail, start, end) => detail.split(start)[1].split(end)[0].trim();
 
   for (const section of [
     ["Doi tuong phu hop", "Cam giac khi dung"],
     ["Cam giac khi dung", "Cach dung"],
     ["Cach dung", "Cach bao quan"]
   ]) {
-    const texts = [store7, store8, store9].map((listing) => moduleText(listing.detail, section[0], section[1]));
+    const texts = [store7, store8, store9].map((listing) => detailSection(listing.detail, section[0], section[1]));
     assert.equal(new Set(texts).size, 3, `${section[0]} should differ per store`);
   }
 });
@@ -347,7 +390,7 @@ test("makeListingDraft differentiates cleanser storage and keeps all sections co
     notes: "sua rua mat 2 trong 1, lam sach sau, dau thua, thanh loc lo chan long"
   };
   const listings = ["7", "8", "9"].map((storeId) => makeListingDraft({ ...base, storeId }));
-  const storage = listings.map((listing) => listing.detail.split("Cach bao quan")[1].trim());
+  const storage = listings.map((listing) => folded(listing.detail).split("Cach bao quan")[1].trim());
 
   assert.equal(new Set(storage).size, 3, "Cach bao quan should differ per store");
   assert.match(storage[0], /kho thoang|nguon nhiet/i);
@@ -356,8 +399,8 @@ test("makeListingDraft differentiates cleanser storage and keeps all sections co
 
   for (const listing of listings) {
     const copy = `${listing.title}\n${listing.detail}`;
-    assert.equal(/\b(?:FAQ|Q:|A:|Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(copy), false);
-    assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|phien ban|khach thich)\b/i.test(copy), false);
+    assert.equal(/\b(?:FAQ|Q:|A:|Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(folded(copy)), false);
+    assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|phien ban|khach thich)\b/i.test(folded(copy)), false);
     assert.equal(validateVietnameseListing(listing).valid, true);
   }
 });
@@ -369,9 +412,9 @@ test("makeListingDraft keeps non-cleanser details buyer-facing instead of intern
     storeId: "8"
   });
 
-  assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|khach thich|phien ban)\b/i.test(listing.detail), false);
-  assert.match(listing.detail, /Cam giac khi dung/);
-  assert.match(listing.detail, /da|be mat/i);
+  assert.equal(/\b(?:Bo cuc|hinh anh|quyet dinh mua|khach thich|phien ban)\b/i.test(folded(listing.detail)), false);
+  assert.match(listing.detail, /Cảm giác khi dùng/);
+  assert.match(folded(listing.detail), /da|be mat/i);
   assert.equal(validateVietnameseListing(listing).valid, true);
 });
 
@@ -422,7 +465,7 @@ test("makeListingDraft can require English identity for final upload", () => {
   assert.equal(listing.title.includes("YSLD80501"), false);
   assert.equal(listing.detail.includes("YSLD80501"), false);
   assert.match(listing.title, /Estee Lauder Soft Clean Infusion/i);
-  assert.match(listing.detail, /duong am|cham soc/i);
+  assert.match(folded(listing.detail), /duong am|cham soc/i);
   assert.equal(validateVietnameseListing(listing).valid, true);
 });
 
@@ -455,26 +498,27 @@ test("makeListingDraft produces five required buyer detail modules without SKU o
   });
 
   assert.match(listing.detail, /^HydraSoft Soothing Lotion/m);
-  assert.match(listing.detail, /Cong dung/i);
-  assert.match(listing.detail, /Phu hop/i);
-  assert.match(listing.detail, /Cam giac/i);
-  assert.match(listing.detail, /Cach dung/i);
-  assert.match(listing.detail, /Bao quan/i);
+  assert.match(listing.detail, /Công dụng/i);
+  assert.match(listing.detail, /phù hợp/i);
+  assert.match(listing.detail, /Cảm giác/i);
+  assert.match(listing.detail, /Cách dùng/i);
+  assert.match(listing.detail, /Bảo quản/i);
   assert.equal(/\b(?:SKU|Shopee|YSLD80501|YSLD80502)\b/i.test(listing.title + listing.detail), false);
-  assert.equal(/[^\x00-\x7F]/.test(listing.title + listing.detail), false);
+  assert.equal(VIETNAMESE_DIACRITIC_RE.test(listing.title + listing.detail), true);
 });
 
-test("validateVietnameseListing rejects platform words, SKU codes, Chinese, accents, and vague titles", () => {
+test("validateVietnameseListing rejects platform words, SKU codes, Chinese, missing diacritics, and vague titles", () => {
   const listing = {
     title: "Premium Beauty Product cho Shopee san pham chinh hang cao cap duong am tot nhat hang ngay",
-    detail: "San pham nay co SKU YSLD80501 va noi dung 中文 co dau tieng Việt."
+    detail: "San pham nay co SKU YSLD80501 va noi dung 中文 khong co dau tieng Viet."
   };
 
   assert.deepEqual(validateVietnameseListing(listing).errors, [
     "Title and detail must not contain Shopee.",
     "Title and detail must not contain authenticity claims.",
     "Title and detail must not contain SKU or full SKU codes.",
-    "Title and detail must use unaccented ASCII Vietnamese with no Chinese.",
+    "Title and detail must not contain Chinese or mojibake.",
+    "Title and detail must use Vietnamese with diacritics.",
     "Title must not use vague generic beauty filler.",
     "Detail is too short for buyer-facing product effects."
   ]);
