@@ -205,6 +205,47 @@ button.danger {
   font-size: 16px;
 }
 
+.section-head.compact {
+  margin: 0 0 10px;
+}
+
+.map-manager {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.map-manager form {
+  margin-top: 0;
+}
+
+.map-list {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.map-row {
+  display: grid;
+  grid-template-columns: minmax(80px, .7fr) 1fr;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.map-row span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .task-picker {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 1.2fr);
@@ -619,6 +660,11 @@ button.danger {
   color: var(--muted);
   padding: 28px;
   text-align: center;
+}
+
+.empty.small {
+  padding: 12px;
+  font-size: 12px;
 }
 
 .toast {

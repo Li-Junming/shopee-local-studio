@@ -3,8 +3,10 @@ let tasks = [];
 let selectedTask = null;
 let pendingParsedTask = null;
 let storeFrameStatus = null;
+let productCodeMappings = [];
 
 const taskForm = document.querySelector("#taskForm");
+const productCodeMapForm = document.querySelector("#productCodeMapForm");
 const storeChecks = document.querySelector("#storeChecks");
 const taskSelect = document.querySelector("#taskSelect");
 const taskSearch = document.querySelector("#taskSearch");
@@ -18,10 +20,13 @@ const quickTaskText = document.querySelector("#quickTaskText");
 const imagePicker = document.querySelector("#imagePicker");
 const pickImagesBtn = document.querySelector("#pickImagesBtn");
 const imageDropZone = document.querySelector("#imageDropZone");
+const productCodeMapList = document.querySelector("#productCodeMapList");
 
 document.querySelector("#refreshBtn").addEventListener("click", refreshAll);
 document.querySelector("#parseQuickBtn").addEventListener("click", parseQuickTask);
 document.querySelector("#createRunBtn").addEventListener("click", createAndRunTask);
+document.querySelector("#reloadProductCodeMapBtn").addEventListener("click", loadProductCodeMap);
+document.querySelector("#deleteProductCodeMapBtn").addEventListener("click", deleteProductCodeMap);
 document.querySelector("#reloadImagesBtn").addEventListener("click", loadImages);
 document.querySelector("#reloadLogsBtn").addEventListener("click", loadLogs);
 document.querySelector("#runAllBtn").addEventListener("click", () => postTaskAction("run-all"));
@@ -67,6 +72,10 @@ showArchived.addEventListener("change", async () => refreshTasks(selectedTask?.i
 taskForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   await createTaskFromForm(false);
+});
+productCodeMapForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveProductCodeMap();
 });
 
 await refreshAll();
@@ -174,13 +183,16 @@ function fillTaskForm(task) {
 }
 
 async function refreshAll() {
-  const [storeData, frameData] = await Promise.all([
+  const [storeData, frameData, mapData] = await Promise.all([
     api("/api/stores"),
-    api("/api/store-frames").catch(() => null)
+    api("/api/store-frames").catch(() => null),
+    api("/api/product-code-map").catch(() => ({ mappings: [] }))
   ]);
   stores = storeData.stores;
   storeFrameStatus = frameData;
+  productCodeMappings = mapData.mappings || [];
   renderStores();
+  renderProductCodeMap();
   await refreshTasks(selectedTask?.id ?? (pendingParsedTask ? null : undefined));
 }
 
@@ -213,6 +225,53 @@ function renderStores() {
       ${escapeHtml(store.label)}
     </label>
   `).join("");
+}
+
+async function loadProductCodeMap() {
+  const data = await api("/api/product-code-map");
+  productCodeMappings = data.mappings || [];
+  renderProductCodeMap();
+  toast("\u6620\u5c04\u5df2\u5237\u65b0");
+}
+
+function renderProductCodeMap() {
+  if (!productCodeMapList) return;
+  productCodeMapList.innerHTML = productCodeMappings.length ? productCodeMappings.map((mapping) => `
+    <button class="map-row" type="button" data-code="${escapeHtml(mapping.productCode)}">
+      <strong>${escapeHtml(mapping.productCode)}</strong>
+      <span>${escapeHtml((mapping.skus || []).join(" "))}</span>
+    </button>
+  `).join("") : '<div class="empty small">\u6682\u65e0\u6620\u5c04</div>';
+  productCodeMapList.querySelectorAll(".map-row").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mapping = productCodeMappings.find((item) => item.productCode === button.dataset.code);
+      if (!mapping) return;
+      productCodeMapForm.elements.productCode.value = mapping.productCode;
+      productCodeMapForm.elements.skuGroup.value = mapping.skus.join(" ");
+    });
+  });
+}
+
+async function saveProductCodeMap() {
+  const productCode = productCodeMapForm.elements.productCode.value.trim();
+  const skuGroup = productCodeMapForm.elements.skuGroup.value.trim();
+  const data = await api(`/api/product-code-map/${encodeURIComponent(productCode)}`, {
+    method: "PUT",
+    body: JSON.stringify({ skuGroup })
+  });
+  productCodeMappings = data.mappings || [];
+  renderProductCodeMap();
+  toast("\u6620\u5c04\u5df2\u4fdd\u5b58");
+}
+
+async function deleteProductCodeMap() {
+  const productCode = productCodeMapForm.elements.productCode.value.trim();
+  if (!productCode) return toast("\u8bf7\u5148\u586b\u5199\u5546\u54c1\u7f16\u7801");
+  const data = await api(`/api/product-code-map/${encodeURIComponent(productCode)}`, { method: "DELETE" });
+  productCodeMappings = data.mappings || [];
+  productCodeMapForm.reset();
+  renderProductCodeMap();
+  toast("\u6620\u5c04\u5df2\u5220\u9664");
 }
 
 function renderTaskSelect() {

@@ -7,9 +7,11 @@ import {
   buildImage2CliArgs,
   buildImage2Config,
   expandProductCodeSkuGroup,
+  listProductCodeMappings,
   makeListingDraft,
   parseTaskText,
   parseSkuGroup,
+  removeProductCodeMapping,
   requireBuyerProductIdentity,
   shouldShowTask,
   sourceReviewState,
@@ -19,6 +21,7 @@ import {
   sourceImagesMissingMessage,
   storesFor,
   taskMatchesQuery,
+  upsertProductCodeMapping,
   validateVietnameseListing
 } from "../src/core.js";
 
@@ -111,6 +114,23 @@ test("expandProductCodeSkuGroup expands mapped product codes and preserves raw S
     { productCode: "PC-002", skus: ["SKU-C", "SKU-A"] }
   ]);
   assert.equal(result.expanded, true);
+});
+
+test("product code map helpers list, save, and delete normalized mappings", () => {
+  const first = upsertProductCodeMapping({}, "pc-001", "sku-a sku-b sku-a");
+  const second = upsertProductCodeMapping(first.map, "pc-002", ["sku-c"]);
+
+  assert.deepEqual(first.mapping, { productCode: "PC-001", skus: ["SKU-A", "SKU-B"] });
+  assert.deepEqual(listProductCodeMappings(second.map), [
+    { productCode: "PC-001", skus: ["SKU-A", "SKU-B"] },
+    { productCode: "PC-002", skus: ["SKU-C"] }
+  ]);
+
+  assert.deepEqual(removeProductCodeMapping(second.map, "pc-001").map, {
+    "PC-002": ["SKU-C"]
+  });
+  assert.throws(() => upsertProductCodeMapping({}, "", "SKU-A"), /Product code is required/);
+  assert.throws(() => upsertProductCodeMapping({}, "PC-003", ""), /At least one SKU is required/);
 });
 
 test("storesFor resolves supported target stores and rejects unknown stores", () => {

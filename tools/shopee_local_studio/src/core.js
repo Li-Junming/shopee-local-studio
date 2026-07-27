@@ -105,6 +105,31 @@ export function expandProductCodeSkuGroup(input, productCodeMap = {}) {
   }
 }
 
+export function listProductCodeMappings(productCodeMap = {}) {
+  const normalized = normalizeProductCodeMap(productCodeMap);
+  return Object.entries(normalized)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([productCode, skus]) => ({ productCode, skus }));
+}
+
+export function upsertProductCodeMapping(productCodeMap = {}, productCode, skuGroup) {
+  const code = parseSkuGroup([productCode])[0];
+  if (!code) throw new Error("Product code is required.");
+  const skus = parseSkuGroup(skuGroup);
+  if (!skus.length) throw new Error("At least one SKU is required.");
+  const map = Object.fromEntries(listProductCodeMappings(productCodeMap).map((item) => [item.productCode, item.skus]));
+  map[code] = skus;
+  return { map, mapping: { productCode: code, skus } };
+}
+
+export function removeProductCodeMapping(productCodeMap = {}, productCode) {
+  const code = parseSkuGroup([productCode])[0];
+  if (!code) throw new Error("Product code is required.");
+  const map = Object.fromEntries(listProductCodeMappings(productCodeMap).map((item) => [item.productCode, item.skus]));
+  delete map[code];
+  return { map, productCode: code };
+}
+
 function normalizeProductCodeMap(productCodeMap = {}) {
   const entries = Array.isArray(productCodeMap)
     ? productCodeMap.map((item) => [item?.code ?? item?.productCode, item?.skus ?? item?.skuGroup])

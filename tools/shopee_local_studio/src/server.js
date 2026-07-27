@@ -13,10 +13,12 @@ import {
   buildPreflightReport,
   describeImage2Runtime,
   expandProductCodeSkuGroup,
+  listProductCodeMappings,
   makeListingDraft,
   normalizeSourceImages,
   parseTaskText,
   parseSkuGroup,
+  removeProductCodeMapping,
   requireBuyerProductIdentity,
   shouldShowTask,
   assertSourceReviewReady,
@@ -24,6 +26,7 @@ import {
   sourceReviewState,
   sourceSkuMatchRisk,
   storesFor,
+  upsertProductCodeMapping,
   validateVietnameseListing
 } from "./core.js";
 import { resolveStoreFrameAssets } from "./storeFrames.js";
@@ -64,6 +67,9 @@ async function route(req, res) {
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true });
   if (url.pathname === "/api/stores") return sendJson(res, 200, { stores: STORE_DEFINITIONS });
   if (url.pathname === "/api/store-frames") return sendJson(res, 200, await storeFrameStatus());
+  if (url.pathname === "/api/product-code-map" && req.method === "GET") return sendJson(res, 200, await productCodeMapResponse());
+  if (parts[0] === "api" && parts[1] === "product-code-map" && parts[2] && req.method === "PUT") return sendJson(res, 200, await upsertProductCodeMapRoute(decodeURIComponent(parts[2]), await readJson(req)));
+  if (parts[0] === "api" && parts[1] === "product-code-map" && parts[2] && req.method === "DELETE") return sendJson(res, 200, await deleteProductCodeMapRoute(decodeURIComponent(parts[2])));
   if (url.pathname === "/api/parse-task-text" && req.method === "POST") return sendJson(res, 200, { task: await resolveParsedTaskIdentifiers(parseTaskText((await readJson(req)).text)) });
   if (url.pathname === "/api/uploads" && req.method === "POST") return sendJson(res, 201, { files: await saveUploadedImages(await readJson(req)) });
   if (url.pathname === "/api/tasks" && req.method === "GET") return sendJson(res, 200, { tasks: await listTasks({
@@ -175,6 +181,39 @@ async function loadProductCodeMap() {
     throw error;
   });
   return text ? JSON.parse(text) : {};
+}
+
+async function saveProductCodeMap(productCodeMap) {
+  await fs.mkdir(path.dirname(productCodeMapPath), { recursive: true });
+  await fs.writeFile(productCodeMapPath, `${JSON.stringify(productCodeMap, null, 2)}\n`, "utf8");
+}
+
+async function productCodeMapResponse() {
+  const map = await loadProductCodeMap();
+  return {
+    path: productCodeMapPath,
+    mappings: listProductCodeMappings(map)
+  };
+}
+
+async function upsertProductCodeMapRoute(productCode, body) {
+  const current = await loadProductCodeMap();
+  const result = upsertProductCodeMapping(current, productCode, body.skus ?? body.skuGroup);
+  await saveProductCodeMap(result.map);
+  return {
+    mapping: result.mapping,
+    mappings: listProductCodeMappings(result.map)
+  };
+}
+
+async function deleteProductCodeMapRoute(productCode) {
+  const current = await loadProductCodeMap();
+  const result = removeProductCodeMapping(current, productCode);
+  await saveProductCodeMap(result.map);
+  return {
+    deletedProductCode: result.productCode,
+    mappings: listProductCodeMappings(result.map)
+  };
 }
 
 async function saveUploadedImages(body) {

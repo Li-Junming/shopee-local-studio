@@ -59,6 +59,28 @@
           </label>
           <button class="primary" type="submit">&#21019;&#24314;&#20219;&#21153;</button>
         </form>
+
+        <section class="map-manager">
+          <div class="section-head compact">
+            <h3>&#21830;&#21697;&#32534;&#30721;&#26144;&#23556;</h3>
+            <button id="reloadProductCodeMapBtn" type="button">&#21047;&#26032;</button>
+          </div>
+          <form id="productCodeMapForm">
+            <label>
+              &#21830;&#21697;&#32534;&#30721;
+              <input name="productCode" autocomplete="off" placeholder="PC001">
+            </label>
+            <label>
+              SKU &#32452;
+              <textarea name="skuGroup" rows="2" placeholder="SKU001 SKU002"></textarea>
+            </label>
+            <div class="inline-actions">
+              <button id="saveProductCodeMapBtn" class="primary" type="submit">&#20445;&#23384;&#26144;&#23556;</button>
+              <button id="deleteProductCodeMapBtn" class="danger" type="button">&#21024;&#38500;&#26144;&#23556;</button>
+            </div>
+          </form>
+          <div id="productCodeMapList" class="map-list"></div>
+        </section>
       </section>
 
       <section class="panel work-panel">
