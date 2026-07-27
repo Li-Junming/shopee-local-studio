@@ -14,6 +14,7 @@ import {
   sourceReviewState,
   assertSourceReviewReady,
   sourceSkuMatchRisk,
+  buildPreflightReport,
   sourceImagesMissingMessage,
   storesFor,
   taskMatchesQuery,
@@ -697,6 +698,98 @@ test("source SKU match risk is high when no requested SKU evidence is present", 
     evidence: "missing_sku_evidence",
     message: "No requested SKU was found in source evidence. Confirm manually before using this source."
   });
+});
+
+test("preflight reports ready when source, listings, frames, and runtime are ready", () => {
+  const listing = makeListingDraft({
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    storeId: "7",
+    requireIdentity: true
+  });
+  const report = buildPreflightReport({
+    skuGroup: ["LC860101"],
+    targetStores: ["7"],
+    sourceReviewRequired: true,
+    sourceConfirmedAt: "2026-07-27T12:00:00.000Z",
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceRowText: "LC860101 Lancome Genifique Serum",
+    listings: { 7: listing }
+  }, {
+    runtime: { apiKeySet: true },
+    storeFrameMissing: [],
+    generatedImageCount: 0
+  });
+
+  assert.equal(report.status, "ready");
+  assert.equal(report.blockers.length, 0);
+  assert.equal(report.warnings.length, 0);
+});
+
+test("preflight requires confirmation before source is approved", () => {
+  const listing = makeListingDraft({
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    storeId: "7",
+    requireIdentity: true
+  });
+  const report = buildPreflightReport({
+    skuGroup: ["LC860101"],
+    targetStores: ["7"],
+    sourceReviewRequired: true,
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    listings: { 7: listing }
+  }, {
+    runtime: { apiKeySet: true },
+    storeFrameMissing: [],
+    generatedImageCount: 0
+  });
+
+  assert.equal(report.status, "needs_confirmation");
+  assert.equal(report.blockers[0].id, "source_review");
+});
+
+test("preflight reports high risk for SKU risk, missing frames, and existing images", () => {
+  const listing = makeListingDraft({
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    storeId: "7",
+    requireIdentity: true
+  });
+  const report = buildPreflightReport({
+    skuGroup: ["LC860101"],
+    targetStores: ["7", "9"],
+    sourceReviewRequired: true,
+    sourceConfirmedAt: "2026-07-27T12:00:00.000Z",
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceMatchedSkuGroup: ["OTHER001"],
+    listings: { 7: listing, 9: listing }
+  }, {
+    runtime: { apiKeySet: true },
+    storeFrameMissing: ["9"],
+    generatedImageCount: 4
+  });
+
+  assert.equal(report.status, "high_risk");
+  assert.deepEqual(report.warnings.map((item) => item.id), ["source_sku_high_risk", "store_frames_missing", "existing_images"]);
+});
+
+test("preflight blocks invalid listings and missing image runtime", () => {
+  const report = buildPreflightReport({
+    skuGroup: ["LC860101"],
+    targetStores: ["7"],
+    sourceImages: ["C:/manual/main.jpg"],
+    listings: {
+      7: { title: "Shopee SKU LC860101", detail: "bad" }
+    }
+  }, {
+    runtime: { apiKeySet: false },
+    storeFrameMissing: [],
+    generatedImageCount: 0
+  });
+
+  assert.equal(report.status, "blocked");
+  assert.deepEqual(report.blockers.map((item) => item.id), ["image_runtime", "listing_invalid"]);
 });
 
 test("task management search matches product, SKU, status, and target store", () => {

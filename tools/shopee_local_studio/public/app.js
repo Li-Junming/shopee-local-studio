@@ -244,6 +244,7 @@ async function renderTask() {
   document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
   document.querySelector("#archiveBtn").textContent = displayTask.archived ? "\u53d6\u6d88\u5f52\u6863" : "\u5f52\u6863\u4efb\u52a1";
   renderStoreFrameStatus(displayTask);
+  await renderPreflight();
   await renderSourceReview(displayTask);
   renderListings(displayTask);
   if (selectedTask) {
@@ -253,6 +254,46 @@ async function renderTask() {
     imageGrid.innerHTML = '<div class="empty">\u521b\u5efa\u4efb\u52a1\u540e\u751f\u6210\u56fe\u7247</div>';
     logs.textContent = "\u5df2\u89e3\u6790\u5230\u5de6\u4fa7\u8868\u5355\u3002\u8bf7\u70b9\u51fb\u201c\u521b\u5efa\u5e76\u4e00\u952e\u5168\u6d41\u7a0b\u201d\uff0c\u624d\u4f1a\u771f\u6b63\u751f\u6210\u56fe\u7247\u5e76\u5904\u7406 BigSeller \u8349\u7a3f\u3002";
   }
+}
+
+async function renderPreflight() {
+  const panel = document.querySelector("#preflightPanel");
+  if (!panel) return;
+  if (!selectedTask) {
+    panel.innerHTML = "";
+    return;
+  }
+  const data = await api(`/api/tasks/${selectedTask.id}/preflight`).catch((error) => ({
+    preflight: {
+      status: "blocked",
+      blockers: [{ id: "preflight_error", label: "\u603b\u68c0\u67e5\u5931\u8d25", message: error.message }],
+      warnings: [],
+      checks: []
+    }
+  }));
+  const preflight = data.preflight || {};
+  const blockers = preflight.blockers || [];
+  const warnings = preflight.warnings || [];
+  const items = [...blockers, ...warnings];
+  panel.innerHTML = `
+    <div class="preflight-head">
+      <strong>\u751f\u6210\u524d\u603b\u68c0\u67e5</strong>
+      <span class="preflight-state ${escapeHtml(preflight.status || "blocked")}">${escapeHtml(preflightLabel(preflight.status))}</span>
+    </div>
+    <div class="preflight-items">${items.length ? items.map((item) => `
+      <div class="preflight-item ${escapeHtml(item.level || "warning")}">
+        <strong>${escapeHtml(item.label)}</strong>
+        <span>${escapeHtml(item.message)}</span>
+      </div>
+    `).join("") : '<div class="preflight-item ok"><strong>\u53ef\u751f\u6210</strong><span>\u6ca1\u6709\u963b\u65ad\u9879\u6216\u9ad8\u98ce\u9669\u63d0\u793a\u3002</span></div>'}</div>
+  `;
+}
+
+function preflightLabel(status) {
+  if (status === "ready") return "\u53ef\u751f\u6210";
+  if (status === "needs_confirmation") return "\u9700\u786e\u8ba4";
+  if (status === "high_risk") return "\u9ad8\u98ce\u9669";
+  return "\u4e0d\u53ef\u751f\u6210";
 }
 
 async function renderSourceReview(displayTask) {

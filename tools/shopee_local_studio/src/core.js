@@ -250,6 +250,86 @@ export function assertSourceReviewReady(task) {
   }
 }
 
+export function buildPreflightReport(task, context = {}) {
+  const checks = [];
+  const blockers = [];
+  const warnings = [];
+  const runtime = context.runtime || {};
+  const sourceState = sourceReviewState(task);
+
+  if (sourceState.required && !sourceState.ready) {
+    add("source_review", "blocker", "1-store source needs confirmation", "Confirm the 1-store source product before generating images.");
+  } else if (!sourceState.required && !sourceState.imageCount && !task?.sourceFallback) {
+    add("source_lookup_needed", "blocker", "1-store source not checked", "Run 1-store source lookup or upload source images before generating.");
+  } else {
+    add("source_review", "ok", "Source is ready", "Source image requirement is satisfied.");
+  }
+
+  if (!runtime.apiKeySet || runtime.invalidBaseUrl || runtime.localProxyReachable === false) {
+    const message = runtime.invalidBaseUrl
+      ? `Invalid OPENAI_BASE_URL: ${runtime.baseUrl}`
+      : (runtime.localProxyReachable === false
+        ? `Cannot connect to image proxy at ${runtime.baseUrl}`
+        : "Missing OPENAI_API_KEY.");
+    add("image_runtime", "blocker", "Image runtime is not ready", message);
+  } else {
+    add("image_runtime", "ok", "Image runtime is ready", "Image generation environment is available.");
+  }
+
+  const listingErrors = listingValidationErrors(task);
+  if (listingErrors.length) {
+    add("listing_invalid", "blocker", "Vietnamese listing copy is invalid", listingErrors.join(" "));
+  } else {
+    add("listing_valid", "ok", "Vietnamese listing copy is valid", "All target store title/detail text passed validation.");
+  }
+
+  if (sourceState.matchRisk.level === "high") {
+    add("source_sku_high_risk", "warning", "Source SKU match is high risk", sourceState.matchRisk.message);
+  } else if (sourceState.matchRisk.level === "normal") {
+    add("source_sku_normal_risk", "info", "Source SKU match is normal", sourceState.matchRisk.message);
+  }
+
+  const missingFrames = context.storeFrameMissing || task?.storeFrameMissing || [];
+  if (missingFrames.length) {
+    add("store_frames_missing", "warning", "Some store frames are missing", `Missing frame references for store ${missingFrames.join(", ")}.`);
+  } else {
+    add("store_frames_ready", "ok", "Store frames are ready", "All target stores have matched frame references.");
+  }
+
+  const generatedImageCount = Number(context.generatedImageCount || 0);
+  if (generatedImageCount > 0) {
+    add("existing_images", "warning", "Generated images already exist", `${generatedImageCount} generated image(s) already exist. Use regenerate if you want to overwrite.`);
+  }
+
+  let status = "ready";
+  if (blockers.some((item) => item.id === "image_runtime" || item.id === "listing_invalid")) status = "blocked";
+  else if (blockers.length) status = "needs_confirmation";
+  else if (warnings.length) status = "high_risk";
+
+  return { status, blockers, warnings, checks };
+
+  function add(id, level, label, message) {
+    const item = { id, level, label, message };
+    checks.push(item);
+    if (level === "blocker") blockers.push(item);
+    if (level === "warning") warnings.push(item);
+  }
+}
+
+function listingValidationErrors(task) {
+  const errors = [];
+  for (const storeId of Array.isArray(task?.targetStores) ? task.targetStores : []) {
+    const listing = task?.listings?.[storeId];
+    if (!listing) {
+      errors.push(`Store ${storeId}: missing listing text.`);
+      continue;
+    }
+    const result = validateVietnameseListing(listing);
+    if (!result.valid) errors.push(`Store ${storeId}: ${result.errors.join(" ")}`);
+  }
+  return errors;
+}
+
 export function sourceSkuMatchRisk(task) {
   if (!task?.sourceReviewRequired) {
     return {

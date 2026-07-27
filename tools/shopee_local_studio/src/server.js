@@ -10,6 +10,7 @@ import {
   buildBigSellerSkuConfig,
   buildImage2CliArgs,
   buildImage2Config,
+  buildPreflightReport,
   describeImage2Runtime,
   makeListingDraft,
   normalizeSourceImages,
@@ -80,6 +81,7 @@ async function route(req, res) {
     if (parts[3] === "reject-source" && req.method === "POST") return sendJson(res, 200, { task: await rejectSourceProduct(task) });
     if (parts[3] === "source-images" && req.method === "GET") return sendJson(res, 200, { images: await listSourceImages(task), review: sourceReviewState(task) });
     if (parts[3] === "source-image" && req.method === "GET") return serveSourceImage(res, task, url.searchParams.get("file"));
+    if (parts[3] === "preflight" && req.method === "GET") return sendJson(res, 200, { preflight: await taskPreflight(task) });
     if (parts[3] === "listings" && req.method === "PUT") return sendJson(res, 200, { task: await updateListings(task, await readJson(req)) });
     if (parts[3] === "regenerate-listings" && req.method === "POST") return sendJson(res, 200, { task: await regenerateListings(task) });
     if (parts[3] === "image2-config" && req.method === "POST") return sendJson(res, 200, { task: await writeImage2Config(task) });
@@ -88,7 +90,7 @@ async function route(req, res) {
     if (parts[3] === "bigseller-config" && req.method === "POST") return sendJson(res, 200, { task: await writeBigSellerConfig(task) });
     if (parts[3] === "discover" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerDiscover(task) });
     if (parts[3] === "save" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerSave(task) });
-    if (parts[3] === "run-all" && req.method === "POST") return sendJson(res, 202, { task: await runFullPipeline(task) });
+    if (parts[3] === "run-all" && req.method === "POST") return runFullPipelineRoute(res, task);
     if (parts[3] === "logs" && req.method === "GET") return sendText(res, 200, await readLogs(task));
     if (parts[3] === "images" && req.method === "GET") return sendJson(res, 200, { images: await listImages(task) });
     if (parts[3] === "image" && req.method === "GET") return serveTaskImage(res, task, url.searchParams.get("file"));
@@ -497,6 +499,18 @@ async function runFullPipeline(task) {
   return task;
 }
 
+async function runFullPipelineRoute(res, task) {
+  const preflight = await taskPreflight(task);
+  if (["blocked", "needs_confirmation"].includes(preflight.status)) {
+    await appendLog(task, `[preflight] ${preflight.status}: ${preflight.blockers.map((item) => item.message).join(" ")}`);
+    task.status = "preflight_blocked";
+    task.updatedAt = new Date().toISOString();
+    await saveTask(task);
+    return sendJson(res, 409, { task, preflight, error: preflight.blockers.map((item) => item.message).join(" ") });
+  }
+  return sendJson(res, 202, { task: await runFullPipeline(task), preflight });
+}
+
 async function runPipelineInBackground(taskId) {
   let task = await readTask(taskId).catch(() => null);
   if (!task) return;
@@ -630,6 +644,25 @@ async function updateStatus(task, status) {
 
 async function storeFrameStatus(storeIds = STORE_DEFINITIONS.map((store) => store.id)) {
   return resolveStoreFrameAssets({ storeIds: storesFor(storeIds).map((store) => store.id) });
+}
+
+async function taskPreflight(task) {
+  const frameStatus = await storeFrameStatus(task.targetStores);
+  const runtime = await image2RuntimeStatus();
+  const images = await listImages(task);
+  return buildPreflightReport(task, {
+    runtime,
+    storeFrameMissing: frameStatus.missing,
+    generatedImageCount: images.length
+  });
+}
+
+async function image2RuntimeStatus() {
+  const runtime = describeImage2Runtime(process.env);
+  if (runtime.localProxy) {
+    runtime.localProxyReachable = await canConnect(runtime.localProxy.host, runtime.localProxy.port, 1500);
+  }
+  return runtime;
 }
 
 async function listTasks(options = {}) {
