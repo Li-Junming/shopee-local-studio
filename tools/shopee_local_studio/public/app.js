@@ -244,6 +244,7 @@ async function renderTask() {
   document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
   document.querySelector("#archiveBtn").textContent = displayTask.archived ? "\u53d6\u6d88\u5f52\u6863" : "\u5f52\u6863\u4efb\u52a1";
   renderStoreFrameStatus(displayTask);
+  await renderSourceReview(displayTask);
   renderListings(displayTask);
   if (selectedTask) {
     await loadImages();
@@ -252,6 +253,61 @@ async function renderTask() {
     imageGrid.innerHTML = '<div class="empty">\u521b\u5efa\u4efb\u52a1\u540e\u751f\u6210\u56fe\u7247</div>';
     logs.textContent = "\u5df2\u89e3\u6790\u5230\u5de6\u4fa7\u8868\u5355\u3002\u8bf7\u70b9\u51fb\u201c\u521b\u5efa\u5e76\u4e00\u952e\u5168\u6d41\u7a0b\u201d\uff0c\u624d\u4f1a\u771f\u6b63\u751f\u6210\u56fe\u7247\u5e76\u5904\u7406 BigSeller \u8349\u7a3f\u3002";
   }
+}
+
+async function renderSourceReview(displayTask) {
+  const panel = document.querySelector("#sourceReviewPanel");
+  if (!panel) return;
+  if (!selectedTask) {
+    panel.innerHTML = "";
+    return;
+  }
+  const data = await api(`/api/tasks/${selectedTask.id}/source-images`).catch(() => ({
+    images: [],
+    review: {
+      status: selectedTask.sourceReviewRequired ? "pending" : "not_required",
+      imageCount: selectedTask.sourceImages?.length || 0,
+      title: selectedTask.sourceTitle || "",
+      editUrl: selectedTask.sourceEditUrl || ""
+    }
+  }));
+  const review = data.review || {};
+  const statusLabel = sourceReviewLabel(review.status);
+  const images = data.images || [];
+  panel.innerHTML = `
+    <div class="source-review-head">
+      <div>
+        <strong>1\u5e97\u6765\u6e90\u786e\u8ba4</strong>
+        <span class="source-state ${escapeHtml(review.status || "not_required")}">${escapeHtml(statusLabel)}</span>
+      </div>
+      <div class="source-actions">
+        <button id="sourceCheckBtn" type="button">\u68c0\u7d22 1\u5e97\u5546\u54c1</button>
+        <button id="confirmSourceBtn" type="button" ${images.length ? "" : "disabled"}>\u786e\u8ba4\u4f7f\u7528</button>
+        <button id="rejectSourceBtn" class="danger" type="button" ${images.length ? "" : "disabled"}>\u4e0d\u5bf9</button>
+      </div>
+    </div>
+    <div class="source-meta">
+      <div><span>SKU</span><strong>${escapeHtml(displayTask.skuGroup.join(" "))}</strong></div>
+      <div><span>1\u5e97\u6807\u9898</span><strong>${escapeHtml(review.title || selectedTask.sourceTitle || "\u5c1a\u672a\u68c0\u7d22")}</strong></div>
+      <div><span>\u7f16\u8f91\u94fe\u63a5</span>${review.editUrl ? `<a href="${escapeHtml(review.editUrl)}" target="_blank" rel="noreferrer">\u6253\u5f00 1\u5e97\u5546\u54c1</a>` : "<strong>\u6682\u65e0</strong>"}</div>
+    </div>
+    <div class="source-image-grid">${images.length ? images.map((image) => `
+      <div class="source-image-item">
+        <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
+        <span>${escapeHtml(image.file)}</span>
+      </div>
+    `).join("") : '<div class="empty">\u5c1a\u672a\u83b7\u53d6 1\u5e97\u6765\u6e90\u56fe</div>'}</div>
+  `;
+  document.querySelector("#sourceCheckBtn")?.addEventListener("click", () => postTaskAction("source-check", "\u5df2\u63d0\u4ea4 1\u5e97\u68c0\u7d22"));
+  document.querySelector("#confirmSourceBtn")?.addEventListener("click", () => postTaskAction("confirm-source", "\u5df2\u786e\u8ba4 1\u5e97\u6765\u6e90"));
+  document.querySelector("#rejectSourceBtn")?.addEventListener("click", () => postTaskAction("reject-source", "\u5df2\u6807\u8bb0\u6765\u6e90\u4e0d\u5bf9"));
+}
+
+function sourceReviewLabel(status) {
+  if (status === "confirmed") return "\u5df2\u786e\u8ba4";
+  if (status === "pending") return "\u5f85\u786e\u8ba4";
+  if (status === "rejected") return "\u5df2\u6807\u8bb0\u4e0d\u5bf9";
+  return "\u672a\u68c0\u7d22";
 }
 
 function pendingDisplayTask() {
@@ -349,12 +405,16 @@ async function saveListings() {
   toast("\u6587\u672c\u5df2\u4fdd\u5b58");
 }
 
-async function postTaskAction(action) {
+async function postTaskAction(action, message = "\u5df2\u63d0\u4ea4\u540e\u53f0\u4efb\u52a1") {
   if (!selectedTask) return;
-  const data = await api(`/api/tasks/${selectedTask.id}/${action}`, { method: "POST" });
-  selectedTask = data.task;
-  await refreshTasks(selectedTask.id, false);
-  toast("\u5df2\u63d0\u4ea4\u540e\u53f0\u4efb\u52a1");
+  try {
+    const data = await api(`/api/tasks/${selectedTask.id}/${action}`, { method: "POST" });
+    selectedTask = data.task;
+    await refreshTasks(selectedTask.id, false);
+    toast(message);
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function archiveSelectedTask() {

@@ -17,7 +17,9 @@ import {
   parseSkuGroup,
   requireBuyerProductIdentity,
   shouldShowTask,
+  assertSourceReviewReady,
   sourceImagesMissingMessage,
+  sourceReviewState,
   storesFor,
   validateVietnameseListing
 } from "./core.js";
@@ -72,6 +74,11 @@ async function route(req, res) {
     if (parts[3] === "archive" && req.method === "POST") return sendJson(res, 200, { task: await setTaskArchived(task, true) });
     if (parts[3] === "unarchive" && req.method === "POST") return sendJson(res, 200, { task: await setTaskArchived(task, false) });
     if (parts[3] === "download" && req.method === "GET") return serveTaskDownload(res, task);
+    if (parts[3] === "source-check" && req.method === "POST") return sendJson(res, 200, { task: await checkSourceProduct(task) });
+    if (parts[3] === "confirm-source" && req.method === "POST") return sendJson(res, 200, { task: await confirmSourceProduct(task) });
+    if (parts[3] === "reject-source" && req.method === "POST") return sendJson(res, 200, { task: await rejectSourceProduct(task) });
+    if (parts[3] === "source-images" && req.method === "GET") return sendJson(res, 200, { images: await listSourceImages(task), review: sourceReviewState(task) });
+    if (parts[3] === "source-image" && req.method === "GET") return serveSourceImage(res, task, url.searchParams.get("file"));
     if (parts[3] === "listings" && req.method === "PUT") return sendJson(res, 200, { task: await updateListings(task, await readJson(req)) });
     if (parts[3] === "regenerate-listings" && req.method === "POST") return sendJson(res, 200, { task: await regenerateListings(task) });
     if (parts[3] === "image2-config" && req.method === "POST") return sendJson(res, 200, { task: await writeImage2Config(task) });
@@ -214,15 +221,20 @@ async function ensureSourceImages(task) {
   task.sourceEditUrl = manifest.editUrl;
   task.sourceTitle = manifest.sourceTitle || "";
   task.sourceDetail = manifest.sourceDetail || "";
+  task.sourceMatchedSkuGroup = Array.isArray(manifest.skus) ? manifest.skus : task.skuGroup;
+  task.sourceReviewRequired = true;
+  task.sourceConfirmedAt = "";
+  task.sourceRejectedAt = "";
   if (task.sourceTitle && shouldUseSourceListing(task)) {
     task.productName = manifest.sourceTitle;
     task.listingSource = "source";
     task.listings = makeListingsForTask(task);
     await appendLog(task, `Updated listing text from source title: ${task.sourceTitle}`);
   }
+  task.status = "source_review_required";
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
-  await appendLog(task, `Loaded ${task.sourceImages.length} source images from 1搴?`);
+  await appendLog(task, `Loaded ${task.sourceImages.length} source images from 1-store. Review is required before image generation.`);
   return task;
 }
 
@@ -230,12 +242,52 @@ async function useFallbackSource(task, reason) {
   task.sourceFallback = true;
   task.sourceFallbackReason = reason;
   task.sourceImages = [];
+  task.sourceReviewRequired = false;
+  task.sourceConfirmedAt = "";
+  task.sourceRejectedAt = "";
   task.listingSource = "fallback";
   task.listings = makeListingsForTask(task, { allowFallbackIdentity: true });
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `[source fallback] ${reason}`);
   await appendLog(task, "[source fallback] Continuing without 1搴?source images. Image jobs will use text-only generation; enter product name/notes for better accuracy.");
+  return task;
+}
+
+async function checkSourceProduct(task) {
+  task.sourceImages = [];
+  task.sourceConfirmedAt = "";
+  task.sourceRejectedAt = "";
+  task.sourceReviewRequired = false;
+  task.sourceFallback = false;
+  task.sourceFallbackReason = "";
+  await saveTask(task);
+  await appendLog(task, "[source review] Starting 1-store source lookup.");
+  return ensureSourceImages(task);
+}
+
+async function confirmSourceProduct(task) {
+  if (!Array.isArray(task.sourceImages) || task.sourceImages.length === 0) {
+    throw new Error("Cannot confirm source product without source images.");
+  }
+  task.sourceReviewRequired = true;
+  task.sourceConfirmedAt = new Date().toISOString();
+  task.sourceRejectedAt = "";
+  task.status = "source_confirmed";
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, `[source review] Confirmed 1-store source product: ${task.sourceTitle || task.productName}`);
+  return task;
+}
+
+async function rejectSourceProduct(task) {
+  task.sourceReviewRequired = true;
+  task.sourceConfirmedAt = "";
+  task.sourceRejectedAt = new Date().toISOString();
+  task.status = "source_rejected";
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, "[source review] Rejected 1-store source product. Rerun lookup or paste/upload source images before generation.");
   return task;
 }
 
@@ -249,6 +301,7 @@ function ensureSourceTaskPaths(task) {
 
 async function writeImage2Config(task) {
   task = await ensureSourceImages(task);
+  assertSourceReviewReady(task);
   const frameStatus = await storeFrameStatus(task.targetStores);
   task.storeFrameRoot = frameStatus.root;
   task.storeFrames = frameStatus.frames;
@@ -392,6 +445,7 @@ function productNameIsSkuOnly(task) {
 
 async function runImage2(task, options = {}) {
   task = await ensureSourceImages(task);
+  assertSourceReviewReady(task);
   await assertImage2RuntimeReady(task);
   await writeImage2Config(task);
   task.status = options.overwrite ? "regenerating_images" : "generating_images";
@@ -445,6 +499,10 @@ async function runPipelineInBackground(taskId) {
   try {
     await updateStatus(task, "pipeline_generating_images");
     task = await ensureSourceImages(task);
+    if (!sourceReviewState(task).ready) {
+      await appendLog(task, "[source review] Full pipeline paused. Confirm the 1-store source product, then run the full pipeline again.");
+      return;
+    }
     await assertImage2RuntimeReady(task);
     await writeImage2Config(task);
     await runCommandAsync(task, "image2", process.execPath, buildImage2CliArgs({
@@ -650,12 +708,39 @@ async function listImages(task) {
   return out;
 }
 
+async function listSourceImages(task) {
+  ensureSourceTaskPaths(task);
+  const out = [];
+  const sourceRoot = path.resolve(task.paths.sourceImagesDir);
+  for (const sourcePath of Array.isArray(task.sourceImages) ? task.sourceImages : []) {
+    const resolved = path.resolve(sourcePath);
+    if (!resolved.startsWith(`${sourceRoot}${path.sep}`)) continue;
+    const file = path.relative(sourceRoot, resolved).split(path.sep).join("/");
+    out.push({
+      file,
+      url: `/api/tasks/${task.id}/source-image?file=${encodeURIComponent(file)}`
+    });
+  }
+  return out;
+}
+
 async function serveTaskImage(res, task, file) {
   if (!file || file.includes("..")) return sendText(res, 400, "Bad image path");
   const imagePath = path.resolve(task.paths.imagesDir, file);
   if (!imagePath.startsWith(path.resolve(task.paths.imagesDir))) return sendText(res, 403, "Forbidden");
   const bytes = await fs.readFile(imagePath);
   res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store" });
+  res.end(bytes);
+}
+
+async function serveSourceImage(res, task, file) {
+  ensureSourceTaskPaths(task);
+  if (!file || file.includes("..")) return sendText(res, 400, "Bad source image path");
+  const sourceRoot = path.resolve(task.paths.sourceImagesDir);
+  const imagePath = path.resolve(sourceRoot, file);
+  if (!imagePath.startsWith(`${sourceRoot}${path.sep}`)) return sendText(res, 403, "Forbidden");
+  const bytes = await fs.readFile(imagePath);
+  res.writeHead(200, { "Content-Type": contentTypeForImage(imagePath), "Cache-Control": "no-store" });
   res.end(bytes);
 }
 
@@ -743,6 +828,13 @@ function extensionForMime(mime) {
   if (/png/i.test(mime)) return ".png";
   if (/webp/i.test(mime)) return ".webp";
   return ".jpg";
+}
+
+function contentTypeForImage(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  return "image/png";
 }
 
 function safeName(name) {

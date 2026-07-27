@@ -224,6 +224,31 @@ export function shouldShowTask(task, options = {}) {
   return taskMatchesQuery(task, options.query);
 }
 
+export function sourceReviewState(task) {
+  const imageCount = Array.isArray(task?.sourceImages) ? task.sourceImages.length : 0;
+  const required = Boolean(task?.sourceReviewRequired);
+  const confirmed = Boolean(task?.sourceConfirmedAt);
+  const rejected = Boolean(task?.sourceRejectedAt);
+  const status = required
+    ? (confirmed ? "confirmed" : (rejected ? "rejected" : "pending"))
+    : "not_required";
+  return {
+    required,
+    ready: !required || confirmed,
+    status,
+    imageCount,
+    title: task?.sourceTitle || "",
+    editUrl: task?.sourceEditUrl || ""
+  };
+}
+
+export function assertSourceReviewReady(task) {
+  const state = sourceReviewState(task);
+  if (!state.ready) {
+    throw new Error("Confirm the 1-store source product before generating images.");
+  }
+}
+
 export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targetStores }) {
   return {
     storeMap: buildBigSellerStoreMap(targetStores),

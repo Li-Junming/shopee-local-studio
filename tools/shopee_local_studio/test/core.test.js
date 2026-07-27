@@ -11,6 +11,8 @@ import {
   parseSkuGroup,
   requireBuyerProductIdentity,
   shouldShowTask,
+  sourceReviewState,
+  assertSourceReviewReady,
   sourceImagesMissingMessage,
   storesFor,
   taskMatchesQuery,
@@ -587,6 +589,49 @@ test("buildImage2CliArgs adds overwrite only when requested", () => {
     "C:/tmp/image2.jobs.json",
     "--overwrite"
   ]);
+});
+
+test("source review blocks fetched 1-store source images until confirmed", () => {
+  const task = {
+    sourceReviewRequired: true,
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceTitle: "Lancome Genifique Serum"
+  };
+
+  assert.deepEqual(sourceReviewState(task), {
+    required: true,
+    ready: false,
+    status: "pending",
+    imageCount: 1,
+    title: "Lancome Genifique Serum",
+    editUrl: ""
+  });
+  assert.throws(() => assertSourceReviewReady(task), /Confirm the 1-store source product/);
+});
+
+test("source review allows confirmed source images and manual source images", () => {
+  const confirmed = {
+    sourceReviewRequired: true,
+    sourceConfirmedAt: "2026-07-27T12:00:00.000Z",
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceTitle: "Lancome Genifique Serum"
+  };
+  const manual = {
+    sourceImages: ["C:/manual/main.jpg"]
+  };
+
+  assert.equal(sourceReviewState(confirmed).ready, true);
+  assert.equal(sourceReviewState(confirmed).status, "confirmed");
+  assert.doesNotThrow(() => assertSourceReviewReady(confirmed));
+  assert.deepEqual(sourceReviewState(manual), {
+    required: false,
+    ready: true,
+    status: "not_required",
+    imageCount: 1,
+    title: "",
+    editUrl: ""
+  });
+  assert.doesNotThrow(() => assertSourceReviewReady(manual));
 });
 
 test("task management search matches product, SKU, status, and target store", () => {
