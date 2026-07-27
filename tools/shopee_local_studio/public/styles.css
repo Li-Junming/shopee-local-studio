@@ -340,6 +340,53 @@ button.danger {
   background: #fff7ed;
 }
 
+.source-risk {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.source-risk.strong {
+  border-color: #9bd6c8;
+  color: #065f46;
+  background: #ecfdf5;
+}
+
+.source-risk.normal {
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.source-risk.high {
+  border-color: #f1b7b2;
+  color: var(--danger);
+  background: #fff1f2;
+}
+
+.source-risk-detail {
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+}
+
+.source-risk-detail span,
+.source-risk-detail em {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.source-risk-detail strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .source-actions {
   display: flex;
   flex-wrap: wrap;

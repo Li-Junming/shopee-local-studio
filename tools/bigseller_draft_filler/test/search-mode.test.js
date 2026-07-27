@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { chooseSearchModeTrigger, isSkuSearchModeText } from "../src/fill-drafts.js";
+import { chooseSearchModeTrigger, isSkuSearchModeText, normalizeSourceRowText } from "../src/fill-drafts.js";
+
+test("normalizes source row text for source match evidence", () => {
+  const text = normalizeSourceRowText("  Store 1\nSKU: YSLD80501\tLancome   Serum  ".repeat(8));
+
+  assert.equal(text.length, 260);
+  assert.equal(/\s{2,}/.test(text), false);
+  assert.equal(text.startsWith("Store 1 SKU: YSLD80501 Lancome Serum"), true);
+});
 
 test("chooses the search type dropdown immediately left of the search input", () => {
   const inputBox = { x: 570, y: 516, width: 433, height: 39 };

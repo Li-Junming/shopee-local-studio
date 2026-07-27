@@ -20,6 +20,7 @@ import {
   assertSourceReviewReady,
   sourceImagesMissingMessage,
   sourceReviewState,
+  sourceSkuMatchRisk,
   storesFor,
   validateVietnameseListing
 } from "./core.js";
@@ -221,10 +222,12 @@ async function ensureSourceImages(task) {
   task.sourceEditUrl = manifest.editUrl;
   task.sourceTitle = manifest.sourceTitle || "";
   task.sourceDetail = manifest.sourceDetail || "";
+  task.sourceRowText = manifest.sourceRowText || "";
   task.sourceMatchedSkuGroup = Array.isArray(manifest.skus) ? manifest.skus : task.skuGroup;
   task.sourceReviewRequired = true;
   task.sourceConfirmedAt = "";
   task.sourceRejectedAt = "";
+  task.sourceMatchRisk = sourceSkuMatchRisk(task);
   if (task.sourceTitle && shouldUseSourceListing(task)) {
     task.productName = manifest.sourceTitle;
     task.listingSource = "source";
@@ -235,6 +238,7 @@ async function ensureSourceImages(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `Loaded ${task.sourceImages.length} source images from 1-store. Review is required before image generation.`);
+  await appendLog(task, `[source match] ${task.sourceMatchRisk.level}: ${task.sourceMatchRisk.message} Matched SKU: ${task.sourceMatchRisk.matchedSkus.join(", ") || "none"}.`);
   return task;
 }
 

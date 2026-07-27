@@ -273,12 +273,14 @@ async function renderSourceReview(displayTask) {
   }));
   const review = data.review || {};
   const statusLabel = sourceReviewLabel(review.status);
+  const risk = review.matchRisk || { level: "none", matchedSkus: [], message: "" };
   const images = data.images || [];
   panel.innerHTML = `
     <div class="source-review-head">
       <div>
         <strong>1\u5e97\u6765\u6e90\u786e\u8ba4</strong>
         <span class="source-state ${escapeHtml(review.status || "not_required")}">${escapeHtml(statusLabel)}</span>
+        <span class="source-risk ${escapeHtml(risk.level || "none")}">${escapeHtml(sourceRiskLabel(risk.level))}</span>
       </div>
       <div class="source-actions">
         <button id="sourceCheckBtn" type="button">\u68c0\u7d22 1\u5e97\u5546\u54c1</button>
@@ -290,6 +292,11 @@ async function renderSourceReview(displayTask) {
       <div><span>SKU</span><strong>${escapeHtml(displayTask.skuGroup.join(" "))}</strong></div>
       <div><span>1\u5e97\u6807\u9898</span><strong>${escapeHtml(review.title || selectedTask.sourceTitle || "\u5c1a\u672a\u68c0\u7d22")}</strong></div>
       <div><span>\u7f16\u8f91\u94fe\u63a5</span>${review.editUrl ? `<a href="${escapeHtml(review.editUrl)}" target="_blank" rel="noreferrer">\u6253\u5f00 1\u5e97\u5546\u54c1</a>` : "<strong>\u6682\u65e0</strong>"}</div>
+    </div>
+    <div class="source-risk-detail">
+      <span>\u5339\u914d\u8bc1\u636e</span>
+      <strong>${escapeHtml(risk.message || "\u5c1a\u65e0\u5339\u914d\u8bc1\u636e")}</strong>
+      <em>${escapeHtml((risk.matchedSkus || []).length ? `SKU: ${risk.matchedSkus.join(" ")}` : "\u672a\u5339\u914d\u5230 SKU")}</em>
     </div>
     <div class="source-image-grid">${images.length ? images.map((image) => `
       <div class="source-image-item">
@@ -308,6 +315,13 @@ function sourceReviewLabel(status) {
   if (status === "pending") return "\u5f85\u786e\u8ba4";
   if (status === "rejected") return "\u5df2\u6807\u8bb0\u4e0d\u5bf9";
   return "\u672a\u68c0\u7d22";
+}
+
+function sourceRiskLabel(level) {
+  if (level === "strong") return "\u5f3a\u5339\u914d";
+  if (level === "normal") return "\u666e\u901a\u5339\u914d";
+  if (level === "high") return "\u9ad8\u98ce\u9669";
+  return "\u672a\u68c0\u67e5";
 }
 
 function pendingDisplayTask() {

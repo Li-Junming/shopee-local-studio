@@ -238,7 +238,8 @@ export function sourceReviewState(task) {
     status,
     imageCount,
     title: task?.sourceTitle || "",
-    editUrl: task?.sourceEditUrl || ""
+    editUrl: task?.sourceEditUrl || "",
+    matchRisk: sourceSkuMatchRisk(task)
   };
 }
 
@@ -247,6 +248,59 @@ export function assertSourceReviewReady(task) {
   if (!state.ready) {
     throw new Error("Confirm the 1-store source product before generating images.");
   }
+}
+
+export function sourceSkuMatchRisk(task) {
+  if (!task?.sourceReviewRequired) {
+    return {
+      level: "none",
+      matchedSkus: [],
+      evidence: "not_required",
+      message: "Source SKU risk check is not required for this task."
+    };
+  }
+  const requestedSkus = parseSkuGroup(task?.skuGroup);
+  const visibleText = [
+    task?.sourceRowText,
+    task?.sourceTitle,
+    task?.sourceDetail
+  ].filter(Boolean).join(" ");
+  const visibleMatches = skusInText(requestedSkus, visibleText);
+  if (visibleMatches.length) {
+    return {
+      level: "strong",
+      matchedSkus: visibleMatches,
+      evidence: "visible_source_text",
+      message: "Requested SKU appears in 1-store source evidence."
+    };
+  }
+
+  const manifestMatches = intersectSkus(requestedSkus, parseSkuGroup(task?.sourceMatchedSkuGroup || []));
+  if (manifestMatches.length) {
+    return {
+      level: "normal",
+      matchedSkus: manifestMatches,
+      evidence: "manifest_sku_group",
+      message: "BigSeller returned the requested SKU group, but visible source text does not show the SKU."
+    };
+  }
+
+  return {
+    level: "high",
+    matchedSkus: [],
+    evidence: "missing_sku_evidence",
+    message: "No requested SKU was found in source evidence. Confirm manually before using this source."
+  };
+}
+
+function skusInText(skus, text) {
+  const normalizedText = String(text || "").toUpperCase();
+  return skus.filter((sku) => normalizedText.includes(sku));
+}
+
+function intersectSkus(left, right) {
+  const wanted = new Set(left);
+  return right.filter((sku) => wanted.has(sku));
 }
 
 export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targetStores }) {

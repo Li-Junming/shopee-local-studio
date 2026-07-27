@@ -13,6 +13,7 @@ import {
   shouldShowTask,
   sourceReviewState,
   assertSourceReviewReady,
+  sourceSkuMatchRisk,
   sourceImagesMissingMessage,
   storesFor,
   taskMatchesQuery,
@@ -604,7 +605,13 @@ test("source review blocks fetched 1-store source images until confirmed", () =>
     status: "pending",
     imageCount: 1,
     title: "Lancome Genifique Serum",
-    editUrl: ""
+    editUrl: "",
+    matchRisk: {
+      level: "high",
+      matchedSkus: [],
+      evidence: "missing_sku_evidence",
+      message: "No requested SKU was found in source evidence. Confirm manually before using this source."
+    }
   });
   assert.throws(() => assertSourceReviewReady(task), /Confirm the 1-store source product/);
 });
@@ -629,9 +636,67 @@ test("source review allows confirmed source images and manual source images", ()
     status: "not_required",
     imageCount: 1,
     title: "",
-    editUrl: ""
+    editUrl: "",
+    matchRisk: {
+      level: "none",
+      matchedSkus: [],
+      evidence: "not_required",
+      message: "Source SKU risk check is not required for this task."
+    }
   });
   assert.doesNotThrow(() => assertSourceReviewReady(manual));
+});
+
+test("source SKU match risk is strong when visible source evidence contains a requested SKU", () => {
+  const task = {
+    skuGroup: ["YSLD80501", "YSLD80502"],
+    sourceReviewRequired: true,
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceTitle: "Lancome Genifique Serum",
+    sourceRowText: "1 store active item YSLD80502 Lancome Genifique"
+  };
+
+  assert.deepEqual(sourceSkuMatchRisk(task), {
+    level: "strong",
+    matchedSkus: ["YSLD80502"],
+    evidence: "visible_source_text",
+    message: "Requested SKU appears in 1-store source evidence."
+  });
+  assert.equal(sourceReviewState(task).matchRisk.level, "strong");
+});
+
+test("source SKU match risk is normal when manifest skus match but visible text has no SKU", () => {
+  const task = {
+    skuGroup: ["YSLD80501"],
+    sourceReviewRequired: true,
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceTitle: "Lancome Genifique Serum",
+    sourceMatchedSkuGroup: ["YSLD80501"]
+  };
+
+  assert.deepEqual(sourceSkuMatchRisk(task), {
+    level: "normal",
+    matchedSkus: ["YSLD80501"],
+    evidence: "manifest_sku_group",
+    message: "BigSeller returned the requested SKU group, but visible source text does not show the SKU."
+  });
+});
+
+test("source SKU match risk is high when no requested SKU evidence is present", () => {
+  const task = {
+    skuGroup: ["YSLD80501"],
+    sourceReviewRequired: true,
+    sourceImages: ["C:/task/source-images/01_source.jpg"],
+    sourceTitle: "Different Product",
+    sourceMatchedSkuGroup: ["OTHER001"]
+  };
+
+  assert.deepEqual(sourceSkuMatchRisk(task), {
+    level: "high",
+    matchedSkus: [],
+    evidence: "missing_sku_evidence",
+    message: "No requested SKU was found in source evidence. Confirm manually before using this source."
+  });
 });
 
 test("task management search matches product, SKU, status, and target store", () => {

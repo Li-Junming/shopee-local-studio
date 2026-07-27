@@ -75,6 +75,10 @@ export function chooseSearchModeTrigger(inputBox, candidates) {
   return ranked[0]?.candidate ?? null;
 }
 
+export function normalizeSourceRowText(text) {
+  return String(text || "").replace(/\s+/g, " ").trim().slice(0, 260);
+}
+
 function resolveFromConfig(config, maybeRelativePath) {
   if (path.isAbsolute(maybeRelativePath)) return maybeRelativePath;
   return path.resolve(config.baseDir, maybeRelativePath);
@@ -356,6 +360,19 @@ async function waitForSkuRowOnCurrentPage(page, skus, sourceStoreMatch, timeoutM
     await page.waitForTimeout(600);
   }
   return -1;
+}
+
+async function sourceRowTextAt(page, rowIndex) {
+  return page.evaluate((index) => {
+    const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
+    const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
+      .filter((row) => {
+        const rowText = row.innerText || "";
+        return rowText.trim() && row.querySelector("td, [role='cell'], img, a");
+      });
+    const rows = primaryRows.length ? primaryRows : fallbackRows;
+    return rows[index]?.innerText || "";
+  }, rowIndex).then(normalizeSourceRowText).catch(() => "");
 }
 
 async function searchSourceRowBySkuGroup(page, listUrl, skus, sourceStoreMatch) {
@@ -700,6 +717,7 @@ async function downloadSourceImagesFromSkuGroups(context, config, outDirArg) {
       throw new Error(`No source row matched SKU group [${product.skus.join(", ")}]. Make sure the 1-store active listing is online and searchable in BigSeller, or provide source image paths manually.`);
     }
 
+    const sourceRowText = await sourceRowTextAt(listPage, rowIndex);
     const editUrl = await openEditUrlFromRow(context, listPage, rowIndex, listUrl);
     const editPage = await context.newPage();
     await editPage.goto(editUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -726,6 +744,7 @@ async function downloadSourceImagesFromSkuGroups(context, config, outDirArg) {
       skus: product.skus,
       sourceStoreMatch,
       editUrl,
+      sourceRowText,
       ...sourceListing,
       sourceImages
     }, null, 2)}\n`, "utf8");
