@@ -1890,10 +1890,11 @@ function basePrompt(task, store, siblingStores = []) {
     "Keep the same product identity and packaging from reference images.",
     `Use target store style: ${store.style}.`,
     storeDifferentiationPrompt(store, siblingStores),
+    imageReviewPrompt(task),
     "Integrated premium ecommerce poster, not pasted collage.",
     "Short readable buyer-facing Vietnamese/English text.",
     "No authenticity badge, Chinh hang, Ban hang chinh hang, Hang chinh hang, Cam ket, 100%, SKU, Doudou, or orange border."
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 function storeDifferentiationPrompt(store, siblingStores = []) {
@@ -1917,6 +1918,29 @@ function storeDifferentiationPrompt(store, siblingStores = []) {
   ].join(" ");
 }
 
+function imageReviewPrompt(task) {
+  const review = normalizeImageReview(task?.imageReview || {});
+  if (review.status !== "needs_regeneration" && review.flags.length === 0) return "";
+  const lines = ["Review-guided regeneration: address the previous manual review before creating this image."];
+  if (review.flags.includes("layout_similar")) {
+    lines.push("Change the composition, hero crop, product placement, and benefit hierarchy so this version is clearly different.");
+  }
+  if (review.flags.includes("color_similar")) {
+    lines.push("Change the palette balance, background lighting, and accent usage while staying inside the target store visual profile.");
+  }
+  if (review.flags.includes("quality_issue")) {
+    lines.push("Improve visual polish, text readability, product clarity, and overall ecommerce finish.");
+  }
+  if (review.flags.includes("wrong_product")) {
+    lines.push("Prioritize exact product identity and packaging from source references; do not invent a different product.");
+  }
+  if (review.flags.length === 0) {
+    lines.push("Create a visibly different version while keeping the product identity and target store profile.");
+  }
+  if (review.notes) lines.push(`Operator review note: ${review.notes}.`);
+  return lines.join(" ");
+}
+
 function productPosterPrompt(task, store, siblingStores = []) {
   return [
     basePrompt(task, store, siblingStores),
@@ -1936,11 +1960,12 @@ function realPhotoPrompt(task, store, siblingStores = [], variant) {
     `800x800 PNG buyer-style real photo for ${task.productName || "the referenced product"}.`,
     "Keep same product and packaging, natural buyer photo, not official advertisement.",
     storeDifferentiationPrompt(store, siblingStores),
+    imageReviewPrompt(task),
     variant === 1
       ? "Scene: handheld or vanity tabletop photo in natural indoor light."
       : "Scene: casual home desk or bathroom counter photo with a different angle and background.",
     "Keep the scene natural and avoid poster text, authenticity badge, SKU, or unrelated watermark."
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 

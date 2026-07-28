@@ -323,6 +323,7 @@ function renderImageResults() {
         </div>
         <div class="result-actions">
           <button type="button" data-action="select">\u6253\u5f00</button>
+          <button type="button" data-action="regenerate">\u91cd\u751f</button>
           <button type="button" data-action="download">\u4e0b\u8f7d</button>
           <button type="button" data-action="archive">${result.archived ? "\u6062\u590d" : "\u5f52\u6863"}</button>
         </div>
@@ -352,6 +353,7 @@ function renderImageResults() {
     card.querySelector("[data-action=download]")?.addEventListener("click", () => {
       window.location.href = `/api/tasks/${card.dataset.taskId}/download`;
     });
+    card.querySelector("[data-action=regenerate]")?.addEventListener("click", () => regenerateImageResultTask(card.dataset.taskId));
     card.querySelector("[data-action=archive]")?.addEventListener("click", () => archiveImageResultTask(card.dataset.taskId));
     card.querySelectorAll("[data-review-status]").forEach((button) => {
       button.addEventListener("click", () => updateImageReview(card.dataset.taskId, { status: button.dataset.reviewStatus, flags: [] }));
@@ -642,6 +644,18 @@ async function archiveImageResultTask(taskId) {
   await refreshTasks(selectedTask?.id, false);
   await loadImageResults(false);
   toast(action === "archive" ? "\u7ed3\u679c\u5df2\u5f52\u6863" : "\u7ed3\u679c\u5df2\u6062\u590d");
+}
+
+async function regenerateImageResultTask(taskId) {
+  try {
+    const data = await api(`/api/tasks/${taskId}/regenerate-images`, { method: "POST" });
+    if (selectedTask?.id === taskId) selectedTask = data.task;
+    await refreshTasks(selectedTask?.id, false);
+    await loadImageResults(false);
+    toast("\u5df2\u6309\u8d28\u68c0\u6807\u8bb0\u63d0\u4ea4\u91cd\u751f");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function updateImageReview(taskId, review) {

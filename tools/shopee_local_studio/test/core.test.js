@@ -249,6 +249,28 @@ test("buildImage2Config tells each store not to reuse sibling store layouts", ()
   assert.match(store5Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of Store 4 Skinora Care/);
 });
 
+test("buildImage2Config adds review-guided regeneration instructions", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    targetStores: ["4", "5"],
+    sourceImages: ["C:/images/main.png"],
+    imageReview: {
+      status: "needs_regeneration",
+      flags: ["layout_similar", "color_similar"],
+      notes: "store 4 and 5 looked too close"
+    }
+  });
+
+  const store4Prompt = config.jobs.find((job) => job.out.startsWith("store_4_skinora_care/01_product"))?.prompt || "";
+
+  assert.match(store4Prompt, /Review-guided regeneration/);
+  assert.match(store4Prompt, /Change the composition/);
+  assert.match(store4Prompt, /Change the palette/);
+  assert.match(store4Prompt, /store 4 and 5 looked too close/);
+});
+
 test("buildBigSellerSkuConfig writes discover jobs using asset root", () => {
   const assetRoot = path.resolve("outputs/local_studio/abc");
   const config = buildBigSellerSkuConfig({

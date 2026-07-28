@@ -395,6 +395,7 @@ async function writeImage2Config(task) {
     targetStores: task.targetStores,
     sourceImages: task.sourceImages,
     storeFrames: task.storeFrames,
+    imageReview: task.imageReview,
     notes: task.notes,
     allowFallbackIdentity: Boolean(task.sourceFallback)
   });
