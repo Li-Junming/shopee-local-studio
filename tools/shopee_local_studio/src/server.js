@@ -9,6 +9,7 @@ import {
   buildBigSellerSourceConfig,
   buildBigSellerSkuConfig,
   buildImage2CliArgs,
+  buildImageArchiveManifest,
   buildImage2Config,
   buildImageResultSummary,
   buildPreflightReport,
@@ -548,6 +549,9 @@ async function runImage2(task, options = {}) {
   task = await ensureSourceImages(task);
   assertSourceReviewReady(task);
   await assertImage2RuntimeReady(task);
+  if (options.overwrite) {
+    task = await archiveCurrentImages(task, "regenerate-images");
+  }
   await writeImage2Config(task);
   task.status = options.overwrite ? "regenerating_images" : "generating_images";
   await saveTask(task);
@@ -618,6 +622,7 @@ async function runPipelineInBackground(taskId) {
       return;
     }
     await assertImage2RuntimeReady(task);
+    task = await archiveCurrentImages(task, "full-pipeline-rerun");
     await writeImage2Config(task);
     await runCommandAsync(task, "image2", process.execPath, buildImage2CliArgs({
       cliPath: image2Cli,
@@ -654,6 +659,35 @@ async function runPipelineInBackground(taskId) {
       await appendLog(task, `[pipeline] ${error.message}`);
     }
   }
+}
+
+async function archiveCurrentImages(task, reason) {
+  const images = await listImages(task);
+  if (!images.length) return task;
+  const manifest = buildImageArchiveManifest(task, images, imageArchiveId());
+  for (const entry of manifest.entries) {
+    await fs.mkdir(path.dirname(entry.to), { recursive: true });
+    await fs.rename(entry.from, entry.to).catch(async (error) => {
+      if (error.code === "ENOENT") return;
+      throw error;
+    });
+  }
+  task.imageArchiveRuns ??= [];
+  task.imageArchiveRuns.push({
+    archiveId: manifest.archiveId,
+    archiveDir: manifest.archiveDir,
+    count: manifest.count,
+    reason,
+    createdAt: new Date().toISOString()
+  });
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, `[image archive] moved ${manifest.count} current image(s) to ${manifest.archiveDir} before ${reason}.`);
+  return task;
+}
+
+function imageArchiveId() {
+  return new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
 }
 
 async function assertImage2RuntimeReady(task) {

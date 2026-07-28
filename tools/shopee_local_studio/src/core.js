@@ -358,6 +358,38 @@ export function buildImageResultSummary(task, images = []) {
   };
 }
 
+export function buildImageArchiveManifest(task, images = [], archiveId) {
+  const id = String(archiveId || "").trim();
+  if (!id) throw new Error("Image archive id is required.");
+  const taskDir = task?.paths?.taskDir;
+  const imagesDir = task?.paths?.imagesDir;
+  if (!taskDir || !imagesDir) throw new Error("Task image paths are required.");
+  const archiveDir = path.join(taskDir, "images-archive", id);
+  const entries = [];
+  for (const image of images) {
+    const file = safeImageRelativePath(image?.file);
+    entries.push({
+      file,
+      from: path.join(imagesDir, ...file.split("/")),
+      to: path.join(archiveDir, ...file.split("/"))
+    });
+  }
+  return {
+    archiveId: id,
+    archiveDir,
+    count: entries.length,
+    entries
+  };
+}
+
+function safeImageRelativePath(file) {
+  const value = String(file || "").replaceAll("\\", "/").trim();
+  if (!value || path.isAbsolute(value) || value.split("/").some((part) => !part || part === "." || part === "..")) {
+    throw new Error(`Unsafe image path: ${file}`);
+  }
+  return value;
+}
+
 const IMAGE_REVIEW_STATUSES = new Set(["pending", "approved", "needs_regeneration", "delivered"]);
 const IMAGE_REVIEW_FLAGS = new Set(["layout_similar", "color_similar", "quality_issue", "wrong_product"]);
 

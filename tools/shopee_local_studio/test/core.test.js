@@ -5,6 +5,7 @@ import {
   buildBigSellerSkuConfig,
   buildBigSellerSourceConfig,
   buildImage2CliArgs,
+  buildImageArchiveManifest,
   buildImage2Config,
   buildImageResultSummary,
   buildTaskProgress,
@@ -769,6 +770,37 @@ test("buildImageResultSummary includes normalized image review state", () => {
     notes: "sent to boss",
     updatedAt: ""
   });
+});
+
+test("buildImageArchiveManifest preserves store paths under timestamped archive", () => {
+  const manifest = buildImageArchiveManifest({
+    paths: {
+      taskDir: "C:/tasks/task-001",
+      imagesDir: "C:/tasks/task-001/images"
+    }
+  }, [
+    { file: "store_4_skinora_care/01_product.png" },
+    { file: "store_5_skinora_fresh/02_effect.png" }
+  ], "20260728-101500");
+
+  assert.equal(manifest.archiveId, "20260728-101500");
+  assert.equal(manifest.count, 2);
+  assert.equal(path.basename(manifest.archiveDir), "20260728-101500");
+  assert.equal(path.basename(path.dirname(manifest.archiveDir)), "images-archive");
+  assert.deepEqual(manifest.entries.map((entry) => entry.file), [
+    "store_4_skinora_care/01_product.png",
+    "store_5_skinora_fresh/02_effect.png"
+  ]);
+  assert.ok(manifest.entries[0].from.endsWith(path.join("images", "store_4_skinora_care", "01_product.png")));
+  assert.ok(manifest.entries[0].to.endsWith(path.join("images-archive", "20260728-101500", "store_4_skinora_care", "01_product.png")));
+  assert.throws(() => buildImageArchiveManifest({
+    paths: {
+      taskDir: "C:/tasks/task-001",
+      imagesDir: "C:/tasks/task-001/images"
+    }
+  }, [
+    { file: "../outside.png" }
+  ], "20260728-101500"), /Unsafe image path/);
 });
 
 test("buildImage2CliArgs adds overwrite only when requested", () => {
