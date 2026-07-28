@@ -20,8 +20,10 @@ import {
   normalizeSourceImages,
   parseTaskText,
   parseSkuGroup,
+  pipelineStartBlockers,
   removeProductCodeMapping,
   requireBuyerProductIdentity,
+  resolveTargetStoreIds,
   shouldShowTask,
   assertSourceReviewReady,
   sourceImagesMissingMessage,
@@ -117,7 +119,7 @@ async function route(req, res) {
 async function createTask(body) {
   const skuResolution = await resolveSkuInput(body.skuGroup);
   const skuGroup = skuResolution.skuGroup;
-  const targetStores = storesFor(body.targetStores || []).map((store) => store.id);
+  const targetStores = resolveTargetStoreIds(body.targetStores);
   const sourceImages = normalizeSourceImages(body.sourceImages);
   const productName = body.productName?.trim() || skuGroup.join(" ");
   if (skuGroup.length === 0) throw new Error("At least one SKU is required.");
@@ -589,12 +591,13 @@ async function runFullPipeline(task) {
 
 async function runFullPipelineRoute(res, task) {
   const preflight = await taskPreflight(task);
-  if (["blocked", "needs_confirmation"].includes(preflight.status)) {
-    await appendLog(task, `[preflight] ${preflight.status}: ${preflight.blockers.map((item) => item.message).join(" ")}`);
+  const blockers = pipelineStartBlockers(preflight);
+  if (blockers.length) {
+    await appendLog(task, `[preflight] ${preflight.status}: ${blockers.map((item) => item.message).join(" ")}`);
     task.status = "preflight_blocked";
     task.updatedAt = new Date().toISOString();
     await saveTask(task);
-    return sendJson(res, 409, { task, preflight, error: preflight.blockers.map((item) => item.message).join(" ") });
+    return sendJson(res, 409, { task, preflight, error: blockers.map((item) => item.message).join(" ") });
   }
   return sendJson(res, 202, { task: await runFullPipeline(task), preflight });
 }

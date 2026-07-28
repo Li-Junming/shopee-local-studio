@@ -145,7 +145,7 @@ async function parseQuickTask() {
   selectedTask = null;
   renderTaskSelect();
   await renderTask();
-  toast("\u5df2\u89e3\u6790\u5230\u5de6\u4fa7\u8868\u5355\uff0c\u8bf7\u70b9\u51fb\u521b\u5efa\u5e76\u4e00\u952e\u5168\u6d41\u7a0b");
+  toast("\u5df2\u89e3\u6790\uff0c\u70b9\u4e00\u952e\u5f00\u59cb\u81ea\u52a8\u751f\u6210");
 }
 
 async function createAndRunTask() {
@@ -163,7 +163,7 @@ async function createTaskFromForm(runAll) {
   taskForm.reset();
   renderStores();
   await refreshTasks(selectedTask.id);
-  toast(runAll ? "\u4efb\u52a1\u5df2\u521b\u5efa\uff0c\u51c6\u5907\u540e\u53f0\u5168\u6d41\u7a0b" : "\u4efb\u52a1\u5df2\u521b\u5efa");
+  toast(runAll ? "\u4efb\u52a1\u5df2\u521b\u5efa\uff0c\u540e\u53f0\u5f00\u59cb\u81ea\u52a8\u6d41\u7a0b" : "\u4efb\u52a1\u5df2\u521b\u5efa");
   if (runAll) await postTaskAction("run-all");
 }
 

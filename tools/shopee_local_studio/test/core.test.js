@@ -13,8 +13,10 @@ import {
   normalizeImageReview,
   parseTaskText,
   parseSkuGroup,
+  pipelineStartBlockers,
   removeProductCodeMapping,
   requireBuyerProductIdentity,
+  resolveTargetStoreIds,
   shouldShowTask,
   sourceReviewState,
   assertSourceReviewReady,
@@ -141,6 +143,12 @@ test("storesFor resolves supported target stores and rejects unknown stores", ()
     "store_9_elora_skin"
   ]);
   assert.throws(() => storesFor(["10"]), /Unsupported store/);
+});
+
+test("resolveTargetStoreIds defaults empty input to stores 4 through 9", () => {
+  assert.deepEqual(resolveTargetStoreIds([]), ["4", "5", "6", "7", "8", "9"]);
+  assert.deepEqual(resolveTargetStoreIds(""), ["4", "5", "6", "7", "8", "9"]);
+  assert.deepEqual(resolveTargetStoreIds(["5", "9"]), ["5", "9"]);
 });
 
 test("buildImage2Config creates four PNG jobs per selected store", () => {
@@ -981,6 +989,40 @@ test("preflight blocks invalid listings and missing image runtime", () => {
 
   assert.equal(report.status, "blocked");
   assert.deepEqual(report.blockers.map((item) => item.id), ["image_runtime", "listing_invalid"]);
+});
+
+test("pipelineStartBlockers allows run-all to begin source lookup", () => {
+  const listing = makeListingDraft({
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    storeId: "7",
+    requireIdentity: true
+  });
+  const report = buildPreflightReport({
+    skuGroup: ["LC860101"],
+    targetStores: ["7"],
+    listings: { 7: listing }
+  }, {
+    runtime: { apiKeySet: true },
+    storeFrameMissing: [],
+    generatedImageCount: 0
+  });
+
+  assert.equal(report.status, "needs_confirmation");
+  assert.deepEqual(report.blockers.map((item) => item.id), ["source_lookup_needed"]);
+  assert.deepEqual(pipelineStartBlockers(report), []);
+});
+
+test("pipelineStartBlockers keeps runtime and source confirmation blockers", () => {
+  const report = {
+    blockers: [
+      { id: "source_lookup_needed", message: "lookup first" },
+      { id: "image_runtime", message: "missing key" },
+      { id: "source_review", message: "confirm source" }
+    ]
+  };
+
+  assert.deepEqual(pipelineStartBlockers(report).map((item) => item.id), ["image_runtime", "source_review"]);
 });
 
 test("task management search matches product, SKU, status, and target store", () => {

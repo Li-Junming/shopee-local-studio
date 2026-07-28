@@ -39,6 +39,8 @@ export const STORE_DEFINITIONS = [
   }
 ];
 
+export const DEFAULT_TARGET_STORE_IDS = STORE_DEFINITIONS.map((store) => store.id);
+
 const BIGSELLER_STORE_MATCH_BY_ID = {
   4: "\u59d0\u592b 4\u5e97\uff08\u80e1\uff09",
   5: "\u59d0\u592b 5\u5e97\uff08\u80e1\uff09",
@@ -202,6 +204,11 @@ export function storesFor(ids) {
     stores.push(store);
   }
   return stores;
+}
+
+export function resolveTargetStoreIds(input) {
+  const storeIds = storesFor(input).map((store) => store.id);
+  return storeIds.length ? storeIds : [...DEFAULT_TARGET_STORE_IDS];
 }
 
 export function parseTaskText(input) {
@@ -504,6 +511,10 @@ export function buildPreflightReport(task, context = {}) {
     if (level === "blocker") blockers.push(item);
     if (level === "warning") warnings.push(item);
   }
+}
+
+export function pipelineStartBlockers(preflight = {}) {
+  return (preflight.blockers || []).filter((item) => item.id !== "source_lookup_needed");
 }
 
 function listingValidationErrors(task) {
