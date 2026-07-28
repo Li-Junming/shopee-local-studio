@@ -79,6 +79,35 @@ export function normalizeSourceRowText(text) {
   return String(text || "").replace(/\s+/g, " ").trim().slice(0, 260);
 }
 
+function normalizeStoreText(value) {
+  return String(value ?? "")
+    .replace(/\s+/g, "")
+    .replace(/[()\uFF08\uFF09]/g, "")
+    .toLowerCase();
+}
+
+export function rowMatchesSkuAndStore(rowText, skus, storeMatch) {
+  const text = String(rowText || "");
+  const wantedSkus = (Array.isArray(skus) ? skus : [])
+    .map((sku) => String(sku).trim())
+    .filter(Boolean);
+  const wantedStore = normalizeStoreText(storeMatch);
+  return Boolean(wantedStore)
+    && normalizeStoreText(text).includes(wantedStore)
+    && wantedSkus.some((sku) => text.includes(sku));
+}
+
+export function buildCopyDraftPlan({ draftRowTexts = [], skus = [], storeMap = [] } = {}) {
+  const targets = [];
+  const skipped = [];
+  for (const store of storeMap) {
+    const exists = draftRowTexts.some((rowText) => rowMatchesSkuAndStore(rowText, skus, store.match));
+    if (exists) skipped.push(store);
+    else targets.push(store);
+  }
+  return { targets, skipped };
+}
+
 function resolveFromConfig(config, maybeRelativePath) {
   if (path.isAbsolute(maybeRelativePath)) return maybeRelativePath;
   return path.resolve(config.baseDir, maybeRelativePath);
@@ -375,6 +404,19 @@ async function sourceRowTextAt(page, rowIndex) {
   }, rowIndex).then(normalizeSourceRowText).catch(() => "");
 }
 
+async function visibleProductRowTexts(page) {
+  return page.evaluate(() => {
+    const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
+    const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
+      .filter((row) => {
+        const rowText = row.innerText || "";
+        return rowText.trim() && row.querySelector("td, [role='cell'], img, a");
+      });
+    const rows = primaryRows.length ? primaryRows : fallbackRows;
+    return rows.map((row) => row.innerText || "").filter(Boolean);
+  }).catch(() => []);
+}
+
 async function searchSourceRowBySkuGroup(page, listUrl, skus, sourceStoreMatch) {
   for (const sku of skus) {
     console.log(`[source] Searching active list by SKU "${sku}".`);
@@ -394,6 +436,124 @@ async function searchSourceRowBySkuGroup(page, listUrl, skus, sourceStoreMatch) 
   }
 
   return -1;
+}
+
+async function clickCopyToDraftFromRow(page, rowIndex) {
+  const clicked = await page.evaluate(({ rowIndex: targetIndex }) => {
+    const visible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    };
+    const textOf = (element) => [
+      element.innerText,
+      element.textContent,
+      element.getAttribute("aria-label"),
+      element.getAttribute("title"),
+      element.getAttribute("class")
+    ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
+    const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
+      .filter((row) => (row.innerText || "").trim() && row.querySelector("td, [role='cell'], img, a"));
+    const rows = primaryRows.length ? primaryRows : fallbackRows;
+    const row = rows[targetIndex];
+    if (!row) return false;
+    const candidates = [...row.querySelectorAll("button, a, i, span, svg, [role='button']")];
+    const copyControl = candidates.find((element) => {
+      if (!visible(element)) return false;
+      const text = textOf(element);
+      return /\u590D\u5236|copy|clone/i.test(text);
+    });
+    if (!copyControl) return false;
+    copyControl.click();
+    return true;
+  }, { rowIndex });
+
+  if (!clicked) {
+    throw new Error(`Could not find copy-to-draft action in source row index ${rowIndex}.`);
+  }
+
+  await page.waitForTimeout(800);
+}
+
+async function selectCopyDialogStores(page, storeMap) {
+  const result = await page.evaluate(({ targets }) => {
+    const normalize = (value) => String(value ?? "")
+      .replace(/\s+/g, "")
+      .replace(/[()\uFF08\uFF09]/g, "")
+      .toLowerCase();
+    const visible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    };
+    const dialogs = [...document.querySelectorAll(".ant-modal, .el-dialog, [role='dialog'], .modal")]
+      .filter((dialog) => visible(dialog));
+    const dialog = dialogs.find((candidate) => {
+      const text = candidate.innerText || "";
+      return text.includes("Shopee") && (text.includes("\u8349\u7A3F") || text.includes("draft"));
+    }) || dialogs.find((candidate) => (candidate.innerText || "").includes("Shopee"));
+    if (!dialog) return { selected: [], missing: targets.map((target) => target.match), dialogFound: false };
+
+    const selected = [];
+    const missing = [];
+    const candidates = [...dialog.querySelectorAll("label, .ant-checkbox-wrapper, .el-checkbox, [role='checkbox'], li, div")]
+      .filter((element) => visible(element) && (element.innerText || element.textContent || "").trim());
+
+    for (const target of targets) {
+      const wanted = normalize(target.match);
+      const option = candidates.find((element) => normalize(element.innerText || element.textContent).includes(wanted));
+      if (!option) {
+        missing.push(target.match);
+        continue;
+      }
+      const checkbox = option.querySelector('input[type="checkbox"]');
+      const checked = checkbox
+        ? checkbox.checked
+        : option.getAttribute("aria-checked") === "true" || option.className.includes("checked");
+      if (!checked) {
+        (checkbox || option).click();
+      }
+      selected.push(target.match);
+    }
+    return { selected, missing, dialogFound: true };
+  }, { targets: storeMap });
+
+  if (!result.dialogFound) {
+    throw new Error("Could not find the copy-to-Shopee-draft dialog.");
+  }
+  if (result.missing.length) {
+    throw new Error(`Could not find target stores in copy dialog: ${result.missing.join(", ")}`);
+  }
+  return result.selected;
+}
+
+async function confirmCopyDialog(page) {
+  const clicked = await page.evaluate(() => {
+    const visible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    };
+    const dialogs = [...document.querySelectorAll(".ant-modal, .el-dialog, [role='dialog'], .modal")]
+      .filter((dialog) => visible(dialog));
+    const dialog = dialogs.find((candidate) => (candidate.innerText || "").includes("Shopee")) || dialogs[0];
+    if (!dialog) return false;
+    const buttons = [...dialog.querySelectorAll("button, [role='button']")].filter(visible);
+    const confirm = buttons.find((button) => {
+      const text = (button.innerText || button.textContent || "").replace(/\s+/g, "");
+      const className = String(button.className || "");
+      return !button.disabled && (text === "\u786E\u5B9A" || /^ok$/i.test(text) || className.includes("primary"));
+    });
+    if (!confirm) return false;
+    confirm.click();
+    return true;
+  });
+
+  if (!clicked) {
+    throw new Error("Could not find the confirm button in the copy dialog.");
+  }
+  await page.waitForTimeout(3000);
 }
 
 async function searchVisibleInputs(page, value) {
@@ -753,6 +913,66 @@ async function downloadSourceImagesFromSkuGroups(context, config, outDirArg) {
   }
 }
 
+async function copySourceProductsToDrafts(context, config) {
+  if (!Array.isArray(config.copyJobs) || config.copyJobs.length === 0) {
+    throw new Error("Config must contain copyJobs when using --copy.");
+  }
+
+  const draftListUrl = config.draftListUrl ?? DEFAULT_DRAFT_LIST_URL;
+  const activeListUrl = config.sourceListUrl ?? config.activeListUrl ?? DEFAULT_ACTIVE_LIST_URL;
+  const draftPage = await context.newPage();
+  const activePage = await context.newPage();
+
+  await draftPage.goto(draftListUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await draftPage.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+  await activePage.goto(activeListUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await activePage.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+
+  for (const product of config.copyJobs) {
+    if (!Array.isArray(product.skus) || product.skus.length === 0) {
+      throw new Error(`Copy job "${product.name ?? "(unnamed)"}" must contain at least one SKU.`);
+    }
+
+    console.log(`\n[copy] ${product.name ?? product.skus[0]}: checking existing target drafts.`);
+    await searchSourceRowBySkuGroup(draftPage, draftListUrl, product.skus, "");
+    const draftRowTexts = await visibleProductRowTexts(draftPage);
+    const plan = buildCopyDraftPlan({
+      draftRowTexts,
+      skus: product.skus,
+      storeMap: config.storeMap
+    });
+
+    for (const store of plan.skipped) {
+      console.log(`[copy] Skip existing draft: ${store.match}`);
+    }
+    if (plan.targets.length === 0) {
+      console.log("[copy] All target stores already have matching drafts. Nothing to copy.");
+      continue;
+    }
+
+    const sourceStoreMatch = product.sourceStoreMatch ?? config.sourceStoreMatch ?? "1\u5E97";
+    let sourceRowIndex = await findSourceRowIndex(activePage, product.skus, sourceStoreMatch);
+    if (sourceRowIndex < 0) {
+      sourceRowIndex = await searchSourceRowBySkuGroup(activePage, activeListUrl, product.skus, sourceStoreMatch);
+    }
+    if (sourceRowIndex < 0 && sourceStoreMatch) {
+      console.log(`[copy] No active row matched store "${sourceStoreMatch}", retrying by SKU only.`);
+      sourceRowIndex = await searchSourceRowBySkuGroup(activePage, activeListUrl, product.skus, "");
+    }
+    if (sourceRowIndex < 0) {
+      throw new Error(`No 1-store active row matched SKU group [${product.skus.join(", ")}].`);
+    }
+
+    const sourceRowText = await sourceRowTextAt(activePage, sourceRowIndex);
+    console.log(`[copy] Source row: ${sourceRowText}`);
+    await clickCopyToDraftFromRow(activePage, sourceRowIndex);
+    const selected = await selectCopyDialogStores(activePage, plan.targets);
+    console.log(`[copy] Selected target stores: ${selected.join(", ")}`);
+    await confirmCopyDialog(activePage);
+    console.log(`[copy] Submitted copy to ${selected.length} target store(s).`);
+  }
+}
+
 async function discoverJobsFromSkuGroups(context, config, outPath) {
   if (!Array.isArray(config.discoverJobs) || config.discoverJobs.length === 0) {
     throw new Error("Config must contain discoverJobs when using --discover.");
@@ -861,6 +1081,11 @@ async function main() {
 
     if (args.mode === "source") {
       await downloadSourceImagesFromSkuGroups(context, config, args.outDir);
+      return;
+    }
+
+    if (args.mode === "copy") {
+      await copySourceProductsToDrafts(context, config);
       return;
     }
 

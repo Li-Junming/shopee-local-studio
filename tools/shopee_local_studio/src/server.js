@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   STORE_DEFINITIONS,
+  buildBigSellerCopyConfig,
   buildBigSellerSourceConfig,
   buildBigSellerSkuConfig,
   buildImage2CliArgs,
@@ -112,6 +113,7 @@ async function route(req, res) {
     if (parts[3] === "generate" && req.method === "POST") return sendJson(res, 202, { task: await runImage2(task) });
     if (parts[3] === "regenerate-images" && req.method === "POST") return sendJson(res, 202, { task: await runImage2(task, { overwrite: true }) });
     if (parts[3] === "bigseller-config" && req.method === "POST") return sendJson(res, 200, { task: await writeBigSellerConfig(task) });
+    if (parts[3] === "copy-source-drafts" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerCopySourceDrafts(task) });
     if (parts[3] === "discover" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerDiscover(task) });
     if (parts[3] === "save" && req.method === "POST") return sendJson(res, 202, { task: await runBigSellerSave(task) });
     if (parts[3] === "run-all" && req.method === "POST") return runFullPipelineRoute(res, task);
@@ -163,6 +165,7 @@ async function createTask(body) {
       image2Config: path.join(taskDir, "image2.jobs.json"),
       bigsellerSourceConfig: path.join(taskDir, "bigseller.source-jobs.json"),
       sourceImageManifest: path.join(taskDir, "source-images", "source-images.json"),
+      bigsellerCopyConfig: path.join(taskDir, "bigseller.copy-jobs.json"),
       bigsellerSkuConfig: path.join(taskDir, "bigseller.sku-jobs.json"),
       bigsellerJobsConfig: path.join(taskDir, "bigseller.discovered.json")
     }
@@ -387,6 +390,7 @@ function ensureSourceTaskPaths(task) {
   task.paths.taskDir ??= path.join(dataRoot, task.id);
   task.paths.sourceImagesDir ??= path.join(task.paths.taskDir, "source-images");
   task.paths.bigsellerSourceConfig ??= path.join(task.paths.taskDir, "bigseller.source-jobs.json");
+  task.paths.bigsellerCopyConfig ??= path.join(task.paths.taskDir, "bigseller.copy-jobs.json");
   task.paths.sourceImageManifest ??= path.join(task.paths.sourceImagesDir, "source-images.json");
 }
 
@@ -433,6 +437,21 @@ async function writeBigSellerConfig(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `Wrote BigSeller SKU config: ${task.paths.bigsellerSkuConfig}`);
+  return task;
+}
+
+async function writeBigSellerCopyConfig(task) {
+  ensureSourceTaskPaths(task);
+  const config = buildBigSellerCopyConfig({
+    productName: task.productName,
+    skuGroup: task.skuGroup,
+    targetStores: task.targetStores
+  });
+  await fs.writeFile(task.paths.bigsellerCopyConfig, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  task.status = "bigseller_copy_config_ready";
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, `Wrote BigSeller copy config: ${task.paths.bigsellerCopyConfig}`);
   return task;
 }
 
@@ -574,6 +593,19 @@ async function runBigSellerDiscover(task) {
     "-Config", task.paths.bigsellerSkuConfig,
     "-Discover",
     "-Out", task.paths.bigsellerJobsConfig
+  ], path.dirname(bigSellerRun));
+  return task;
+}
+
+async function runBigSellerCopySourceDrafts(task) {
+  await writeBigSellerCopyConfig(task);
+  task.status = "copying_source_to_bigseller_drafts";
+  await saveTask(task);
+  runCommand(task, "bigseller_copy", "powershell", [
+    "-ExecutionPolicy", "Bypass",
+    "-File", bigSellerRun,
+    "-Config", task.paths.bigsellerCopyConfig,
+    "-Copy"
   ], path.dirname(bigSellerRun));
   return task;
 }

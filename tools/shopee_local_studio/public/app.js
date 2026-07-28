@@ -40,6 +40,7 @@ document.querySelector("#runAllBtn").addEventListener("click", () => postTaskAct
 document.querySelector("#writeImageConfigBtn").addEventListener("click", () => postTaskAction("image2-config"));
 document.querySelector("#generateBtn").addEventListener("click", () => postTaskAction("generate"));
 document.querySelector("#regenerateImagesBtn").addEventListener("click", () => postTaskAction("regenerate-images"));
+document.querySelector("#copySourceDraftsBtn").addEventListener("click", () => postTaskAction("copy-source-drafts", "\u5df2\u63d0\u4ea4 1\u5e97\u590d\u5236\u5230\u76ee\u6807\u5e97\u8349\u7a3f\u7bb1"));
 document.querySelector("#writeBigsellerBtn").addEventListener("click", () => postTaskAction("bigseller-config"));
 document.querySelector("#discoverBtn").addEventListener("click", () => postTaskAction("discover"));
 document.querySelector("#saveBtn").addEventListener("click", () => postTaskAction("save"));
@@ -498,6 +499,7 @@ function progressStageLabel(stage) {
   if (stage === "source_lookup") return "1\u5e97\u68c0\u7d22";
   if (stage === "source_review") return "1\u5e97\u786e\u8ba4";
   if (stage === "image_generation") return "\u751f\u56fe";
+  if (stage === "bigseller_copy") return "\u590d\u5236\u8349\u7a3f";
   if (stage === "bigseller_discover") return "\u67e5\u627e\u8349\u7a3f";
   if (stage === "bigseller_save") return "\u4fdd\u5b58\u8349\u7a3f";
   if (stage === "done") return "\u5b8c\u6210";
@@ -606,7 +608,7 @@ function pendingDisplayTask() {
 }
 
 function setTaskActionButtonsDisabled(disabled) {
-  ["runAllBtn", "downloadTaskBtn", "archiveBtn", "deleteTaskBtn", "writeImageConfigBtn", "generateBtn", "regenerateImagesBtn", "writeBigsellerBtn", "discoverBtn", "saveBtn", "regenerateListingsBtn", "saveListingsBtn", "reloadImagesBtn", "reloadLogsBtn"].forEach((id) => {
+  ["runAllBtn", "downloadTaskBtn", "archiveBtn", "deleteTaskBtn", "writeImageConfigBtn", "generateBtn", "regenerateImagesBtn", "copySourceDraftsBtn", "writeBigsellerBtn", "discoverBtn", "saveBtn", "regenerateListingsBtn", "saveListingsBtn", "reloadImagesBtn", "reloadLogsBtn"].forEach((id) => {
     const button = document.querySelector(`#${id}`);
     if (button) button.disabled = disabled;
   });

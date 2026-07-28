@@ -64,6 +64,8 @@ export function parseArgs(argv) {
       args.mode = "discover";
     } else if (arg === "--source") {
       args.mode = "source";
+    } else if (arg === "--copy") {
+      args.mode = "copy";
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -80,8 +82,9 @@ export async function loadConfig(configPath) {
   const hasJobs = Array.isArray(config.jobs) && config.jobs.length > 0;
   const hasDiscoverJobs = Array.isArray(config.discoverJobs) && config.discoverJobs.length > 0;
   const hasSourceJobs = Array.isArray(config.sourceJobs) && config.sourceJobs.length > 0;
-  if (!hasJobs && !hasDiscoverJobs && !hasSourceJobs) {
-    throw new Error("Config must contain a non-empty jobs, discoverJobs, or sourceJobs array.");
+  const hasCopyJobs = Array.isArray(config.copyJobs) && config.copyJobs.length > 0;
+  if (!hasJobs && !hasDiscoverJobs && !hasSourceJobs && !hasCopyJobs) {
+    throw new Error("Config must contain a non-empty jobs, discoverJobs, sourceJobs, or copyJobs array.");
   }
 
   if (!Array.isArray(config.storeMap) || config.storeMap.length === 0) {
@@ -105,6 +108,7 @@ Usage:
   node src/fill-drafts.js --config jobs.json --save    Fill and click only the white 保存 button
   node src/fill-drafts.js --config jobs.json --login   Open Chrome for BigSeller login
   node src/fill-drafts.js --config sku-jobs.json --discover --out jobs.json
+  node src/fill-drafts.js --config copy-jobs.json --copy
 
 Options:
   --config <path>   Path to jobs config. Default: jobs.json
@@ -113,6 +117,7 @@ Options:
   --save            Edit the page and click the white 保存 button. Never clicks 保存&发布.
   --login           Open the same Chrome profile and wait until BigSeller is logged in.
   --discover        Find draft edit URLs from SKU groups and store names.
+  --copy            Copy matched 1-store online products to missing target-store Shopee drafts.
   --help            Show this help.
 `;
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
 import {
+  buildBigSellerCopyConfig,
   buildBigSellerSkuConfig,
   buildBigSellerSourceConfig,
   buildImage2CliArgs,
@@ -339,6 +340,25 @@ test("buildBigSellerSkuConfig writes discover jobs using asset root", () => {
 
   assert.deepEqual(config.discoverJobs[0].skus, ["LC860101", "LC860102"]);
   assert.equal(config.discoverJobs[0].assetRoot, assetRoot);
+});
+
+test("buildBigSellerCopyConfig writes copy jobs from 1-store to target stores", () => {
+  const config = buildBigSellerCopyConfig({
+    productName: "Lancome Genifique",
+    skuGroup: ["LC860101", "LC860102"],
+    targetStores: ["4", "5", "6", "7", "8", "9"]
+  });
+
+  assert.deepEqual(config.storeMap.map((store) => store.folder), [
+    "store_4_skinora_care",
+    "store_5_skinora_fresh",
+    "store_6_skinora_luxe",
+    "store_7_skinora",
+    "store_8_skinora_beauty",
+    "store_9_elora_skin"
+  ]);
+  assert.deepEqual(config.copyJobs[0].skus, ["LC860101", "LC860102"]);
+  assert.equal(config.copyJobs[0].sourceStoreMatch, "\u0031\u5e97");
 });
 
 test("buildBigSellerSourceConfig writes source jobs using SKU group and source image directory", () => {
@@ -1120,6 +1140,7 @@ test("buildTaskProgress explains waiting source confirmation", () => {
 
 test("buildTaskProgress maps active pipeline stages", () => {
   assert.equal(buildTaskProgress({ status: "pipeline_generating_images" }).stage, "image_generation");
+  assert.equal(buildTaskProgress({ status: "copying_source_to_bigseller_drafts" }).stage, "bigseller_copy");
   assert.equal(buildTaskProgress({ status: "pipeline_discovering_bigseller_drafts" }).stage, "bigseller_discover");
   assert.equal(buildTaskProgress({ status: "pipeline_saving_bigseller_drafts" }).stage, "bigseller_save");
 });

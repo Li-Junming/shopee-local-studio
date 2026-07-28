@@ -7,6 +7,7 @@ param(
   [switch]$Login,
   [switch]$Discover,
   [switch]$Source,
+  [switch]$Copy,
   [switch]$Help
 )
 
@@ -30,6 +31,8 @@ if ($Save) {
   $argsList += @("--discover", "--out", $Out)
 } elseif ($Source) {
   $argsList += @("--source", "--out-dir", $OutDir)
+} elseif ($Copy) {
+  $argsList += "--copy"
 } elseif ($Login) {
   $argsList += "--login"
 } elseif ($Fill) {

@@ -641,6 +641,9 @@ export function buildTaskProgress(task = {}, context = {}) {
   if (["pipeline_generating_images", "generating_images", "regenerating_images", "image2_config_ready"].includes(status)) {
     return progress("image_generation", "running", "\u6b63\u5728\u751f\u6210\u5404\u5e97\u56fe\u7247", "\u7cfb\u7edf\u6b63\u5728\u6309 4-9 \u5e97\u8fb9\u6846\u548c\u5e97\u94fa\u98ce\u683c\u751f\u6210\u56fe\u3002", "\u7b49\u5f85\u751f\u6210\u5b8c\u6210\uff0c\u7136\u540e\u5230\u7ed3\u679c\u5e93\u6309\u5e97\u94fa\u67e5\u770b\u3002");
   }
+  if (["copying_source_to_bigseller_drafts", "bigseller_copy_config_ready"].includes(status)) {
+    return progress("bigseller_copy", "running", "\u6b63\u5728\u590d\u5236 1\u5e97\u5230\u76ee\u6807\u5e97\u8349\u7a3f", "\u7cfb\u7edf\u6b63\u5728 BigSeller \u6309 SKU \u627e\u5230 1\u5e97\u5728\u7ebf\u5546\u54c1\uff0c\u5e76\u53ea\u590d\u5236\u5230\u7f3a\u5931\u8349\u7a3f\u7684 4-9 \u5e97\u3002", "\u7b49\u5f85 BigSeller \u590d\u5236\u5b8c\u6210\uff0c\u7136\u540e\u518d\u67e5\u627e\u8349\u7a3f\u5e76\u4e0a\u4f20\u56fe\u7247\u3002");
+  }
   if (["pipeline_discovering_bigseller_drafts", "discovering_bigseller_drafts", "bigseller_config_ready"].includes(status)) {
     return progress("bigseller_discover", "running", "\u6b63\u5728\u67e5\u627e BigSeller \u8349\u7a3f", "\u56fe\u7247\u6b65\u9aa4\u5df2\u5b8c\u6210\uff0c\u6b63\u5728\u5339\u914d\u5404\u5e97 BigSeller \u8349\u7a3f\u3002", "\u7b49\u5f85\u8349\u7a3f\u5339\u914d\u5b8c\u6210\u3002");
   }
@@ -742,6 +745,19 @@ export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targ
         name: productName,
         skus: parseSkuGroup(skuGroup),
         assetRoot: path.resolve(assetRoot)
+      }
+    ]
+  };
+}
+
+export function buildBigSellerCopyConfig({ productName, skuGroup, targetStores, sourceStoreMatch = "1\u5e97" }) {
+  return {
+    storeMap: buildBigSellerStoreMap(targetStores),
+    copyJobs: [
+      {
+        name: productName,
+        skus: parseSkuGroup(skuGroup),
+        sourceStoreMatch
       }
     ]
   };

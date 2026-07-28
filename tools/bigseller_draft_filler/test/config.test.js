@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
-import { defaultUserDataDir, normalizeBrowserConfig, parseArgs } from "../src/config.js";
+import { defaultUserDataDir, loadConfig, normalizeBrowserConfig, parseArgs } from "../src/config.js";
 
 test("defaults to dry run and requires an explicit save flag", () => {
   const args = parseArgs([]);
@@ -44,6 +47,31 @@ test("source mode accepts an output directory", () => {
   assert.equal(args.configPath, "source-jobs.json");
   assert.equal(args.outDir, "source-images");
   assert.equal(args.mode, "source");
+});
+
+test("copy mode is explicit", () => {
+  const args = parseArgs(["--config", "copy-jobs.json", "--copy"]);
+
+  assert.equal(args.configPath, "copy-jobs.json");
+  assert.equal(args.mode, "copy");
+});
+
+test("loadConfig accepts copy jobs", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "bigseller-copy-config-"));
+  const configPath = path.join(root, "copy-jobs.json");
+  await writeFile(configPath, JSON.stringify({
+    storeMap: [
+      { match: "\u59d0\u592b 4\u5e97\uff08\u80e1\uff09", folder: "store_4_skinora_care" }
+    ],
+    copyJobs: [
+      { name: "Serum", skus: ["SKU001"], sourceStoreMatch: "\u59d0\u592b1\u5e97\uff08\u80e1\uff09" }
+    ]
+  }), "utf8");
+
+  const config = await loadConfig(configPath);
+
+  assert.equal(config.copyJobs.length, 1);
+  assert.equal(config.storeMap[0].folder, "store_4_skinora_care");
 });
 
 test("default browser profile is global instead of task-local", () => {
