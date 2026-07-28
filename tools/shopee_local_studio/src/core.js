@@ -48,6 +48,51 @@ const BIGSELLER_STORE_MATCH_BY_ID = {
   9: "\u59d0\u592b9\u5e97\uff08\u80e1\uff09"
 };
 
+const STORE_DIFFERENTIATION_BY_ID = {
+  4: {
+    name: "gentle daily-care",
+    palette: "warm ivory, soft gold, muted peach, low contrast",
+    composition: "calm centered product, rounded care modules, soft bathroom or vanity cues",
+    hook: "daily gentle care, hydration comfort, routine trust",
+    avoid: "clinical blue layouts, red conversion blocks, dramatic luxury shadows"
+  },
+  5: {
+    name: "fresh bright",
+    palette: "clean white, fresh mint, light aqua, bright daylight",
+    composition: "airy diagonal product flow, fresh splash or leaf cues, open whitespace",
+    hook: "freshness, quick visible feeling, clean lightweight use",
+    avoid: "heavy gold luxury, dense red callouts, soft pink beauty layouts"
+  },
+  6: {
+    name: "premium luxe",
+    palette: "champagne gold, calm taupe, pearl white, controlled shadow",
+    composition: "premium hero close-up, layered depth, refined editorial spacing",
+    hook: "high-end care, refined repair feeling, giftable premium impression",
+    avoid: "casual buyer clutter, playful pastel freshness, aggressive promo layout"
+  },
+  7: {
+    name: "pink beauty",
+    palette: "soft pink, rose gold, creamy white, elegant glow",
+    composition: "beauty-counter poster, feminine arcs, polished product highlight",
+    hook: "elegant beauty routine, soft glow, approachable skincare",
+    avoid: "clinical blue, strong red blocks, flat marketplace grid"
+  },
+  8: {
+    name: "clean clinical",
+    palette: "white, deep blue, silver gray, crisp contrast",
+    composition: "organized clinical blocks, clear benefit icons, precise spacing",
+    hook: "professional care, clean efficacy, easy-to-scan benefits",
+    avoid: "pink-gold elegance, warm ivory daily-care softness, red conversion styling"
+  },
+  9: {
+    name: "bold conversion",
+    palette: "white, brand red, soft gray, high clarity",
+    composition: "strong hero crop, bold benefit hierarchy, energetic ecommerce balance",
+    hook: "fast buying confidence, visible key benefits, strong shelf impact",
+    avoid: "low-contrast minimalism, clinical blue systems, luxury editorial restraint"
+  }
+};
+
 export function buildBigSellerStoreMap(targetStores = STORE_DEFINITIONS.map((store) => store.id)) {
   return storesFor(targetStores).map((store) => ({
     match: BIGSELLER_STORE_MATCH_BY_ID[store.id] || `${store.id}\u5e97`,
@@ -229,10 +274,11 @@ export function buildImage2Config(task) {
 
   const jobs = [];
   for (const store of stores) {
-    jobs.push(makeJob(store, "01_product.png", productPosterPrompt(safeTask, store)));
-    jobs.push(makeJob(store, "02_effect.png", effectPosterPrompt(safeTask, store)));
-    jobs.push(makeJob(store, "03_real.png", realPhotoPrompt(safeTask, store, 1)));
-    jobs.push(makeJob(store, "04_real.png", realPhotoPrompt(safeTask, store, 2)));
+    const siblingStores = stores.filter((item) => item.id !== store.id);
+    jobs.push(makeJob(store, "01_product.png", productPosterPrompt(safeTask, store, siblingStores)));
+    jobs.push(makeJob(store, "02_effect.png", effectPosterPrompt(safeTask, store, siblingStores)));
+    jobs.push(makeJob(store, "03_real.png", realPhotoPrompt(safeTask, store, siblingStores, 1)));
+    jobs.push(makeJob(store, "04_real.png", realPhotoPrompt(safeTask, store, siblingStores, 2)));
   }
 
   return {
@@ -1814,36 +1860,59 @@ function storeDetailFor(storeId) {
   ];
 }
 
-function basePrompt(task, store) {
+function basePrompt(task, store, siblingStores = []) {
   const productName = task.productName || "the referenced product";
   return [
     `800x800 PNG Vietnamese Shopee ecommerce poster for ${productName}.`,
     "Keep the same product identity and packaging from reference images.",
     `Use target store style: ${store.style}.`,
+    storeDifferentiationPrompt(store, siblingStores),
     "Integrated premium ecommerce poster, not pasted collage.",
     "Short readable buyer-facing Vietnamese/English text.",
     "No authenticity badge, Chinh hang, Ban hang chinh hang, Hang chinh hang, Cam ket, 100%, SKU, Doudou, or orange border."
   ].join(" ");
 }
 
-function productPosterPrompt(task, store) {
+function storeDifferentiationPrompt(store, siblingStores = []) {
+  const profile = STORE_DIFFERENTIATION_BY_ID[store.id] || {
+    name: "store-specific",
+    palette: store.style,
+    composition: "use this store's watermark/frame reference as the layout cue",
+    hook: "clear buyer-facing benefit hierarchy",
+    avoid: "copying another selected store's visual system"
+  };
+  const siblingNames = siblingStores.map((item) => item.label).filter(Boolean);
   return [
-    basePrompt(task, store),
+    `Store differentiation profile: ${profile.name}.`,
+    `Palette: ${profile.palette}.`,
+    `Composition: ${profile.composition}.`,
+    `Primary buyer hook: ${profile.hook}.`,
+    `Avoid: ${profile.avoid}.`,
+    siblingNames.length
+      ? `Do not reuse the layout, palette, hero crop, or benefit hierarchy of ${siblingNames.join(" or ")}.`
+      : "Keep this store visually distinct from other shops using the same product."
+  ].join(" ");
+}
+
+function productPosterPrompt(task, store, siblingStores = []) {
+  return [
+    basePrompt(task, store, siblingStores),
     "Main product poster: brand and product name visible, product large, premium lighting, clear benefit bullets."
   ].join(" ");
 }
 
-function effectPosterPrompt(task, store) {
+function effectPosterPrompt(task, store, siblingStores = []) {
   return [
-    basePrompt(task, store),
+    basePrompt(task, store, siblingStores),
     "Effect poster: product plus realistic beauty result/usage scene, 3 concise benefit icons, integrated layout."
   ].join(" ");
 }
 
-function realPhotoPrompt(task, store, variant) {
+function realPhotoPrompt(task, store, siblingStores = [], variant) {
   return [
     `800x800 PNG buyer-style real photo for ${task.productName || "the referenced product"}.`,
     "Keep same product and packaging, natural buyer photo, not official advertisement.",
+    storeDifferentiationPrompt(store, siblingStores),
     variant === 1
       ? "Scene: handheld or vanity tabletop photo in natural indoor light."
       : "Scene: casual home desk or bathroom counter photo with a different angle and background.",

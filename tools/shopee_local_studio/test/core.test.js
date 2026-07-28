@@ -212,6 +212,42 @@ test("buildImage2Config appends each target store frame only to that store jobs"
   assert.ok(config.jobs[0].prompt.includes("target store watermark/frame reference"));
 });
 
+test("buildImage2Config applies distinct visual direction for stores 4, 5, and 6", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    targetStores: ["4", "5", "6"],
+    sourceImages: ["C:/images/main.png"]
+  });
+
+  const store4Prompt = config.jobs.find((job) => job.out.startsWith("store_4_skinora_care/01_product"))?.prompt || "";
+  const store5Prompt = config.jobs.find((job) => job.out.startsWith("store_5_skinora_fresh/01_product"))?.prompt || "";
+  const store6Prompt = config.jobs.find((job) => job.out.startsWith("store_6_skinora_luxe/01_product"))?.prompt || "";
+
+  assert.match(store4Prompt, /Store differentiation profile: gentle daily-care/);
+  assert.match(store5Prompt, /Store differentiation profile: fresh bright/);
+  assert.match(store6Prompt, /Store differentiation profile: premium luxe/);
+  assert.notEqual(store4Prompt, store5Prompt);
+  assert.notEqual(store5Prompt, store6Prompt);
+});
+
+test("buildImage2Config tells each store not to reuse sibling store layouts", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    targetStores: ["4", "5"],
+    sourceImages: ["C:/images/main.png"]
+  });
+
+  const store4Prompt = config.jobs.find((job) => job.out.startsWith("store_4_skinora_care/01_product"))?.prompt || "";
+  const store5Prompt = config.jobs.find((job) => job.out.startsWith("store_5_skinora_fresh/01_product"))?.prompt || "";
+
+  assert.match(store4Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of Store 5 Skinora Fresh/);
+  assert.match(store5Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of Store 4 Skinora Care/);
+});
+
 test("buildBigSellerSkuConfig writes discover jobs using asset root", () => {
   const assetRoot = path.resolve("outputs/local_studio/abc");
   const config = buildBigSellerSkuConfig({
