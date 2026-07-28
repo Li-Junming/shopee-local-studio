@@ -350,6 +350,7 @@ export function buildImageResultSummary(task, images = []) {
     createdAt: task?.createdAt || "",
     updatedAt: task?.updatedAt || "",
     imageCount: images.length,
+    imageFiles: images.map((image) => image.file).filter(Boolean),
     storeImageCounts: [...counts.values()].sort(sortByStore),
     storePreviewGroups: [...previewGroups.values()].sort(sortByStore),
     previewImages: images.slice(0, 4),
@@ -433,18 +434,80 @@ export function buildImage2CliArgs({ cliPath, configPath, overwrite = false }) {
 }
 
 export function taskMatchesQuery(task, query = "") {
-  const rawQuery = String(query || "").trim().toLowerCase();
-  if (!rawQuery) return true;
-  const terms = rawQuery.split(/\s+/).filter(Boolean);
+  const terms = searchTerms(query);
+  if (!terms.length) return true;
+  const review = normalizeImageReview(task?.imageReview || {});
   const searchable = [
     task?.id,
     task?.productName,
     task?.status,
+    review.status,
+    ...review.flags,
+    review.notes,
     ...(Array.isArray(task?.skuGroup) ? task.skuGroup : []),
     ...(Array.isArray(task?.productCodes) ? task.productCodes : []),
     ...(Array.isArray(task?.productCodeMappings) ? task.productCodeMappings.flatMap((item) => [item.productCode, ...(item.skus || [])]) : []),
     ...(Array.isArray(task?.targetStores) ? task.targetStores.map((storeId) => `store:${storeId}`) : [])
-  ].filter(Boolean).join(" ").toLowerCase();
+  ];
+  return matchesSearchTerms(searchable, terms);
+}
+
+export function imageResultMatchesQuery(result, query = "") {
+  const terms = searchTerms(query);
+  if (!terms.length) return true;
+  const review = normalizeImageReview(result?.imageReview || {});
+  const storeFields = [
+    ...(Array.isArray(result?.targetStores) ? result.targetStores.map((storeId) => `store:${storeId}`) : []),
+    ...(Array.isArray(result?.storeImageCounts) ? result.storeImageCounts.flatMap((item) => [
+      item.store,
+      item.store ? `store:${item.store}` : "",
+      item.storeLabel
+    ]) : []),
+    ...(Array.isArray(result?.storePreviewGroups) ? result.storePreviewGroups.flatMap((group) => [
+      group.store,
+      group.store ? `store:${group.store}` : "",
+      group.storeLabel,
+      ...(Array.isArray(group.previewImages) ? group.previewImages.flatMap(imageSearchFields) : [])
+    ]) : [])
+  ];
+  const searchable = [
+    result?.id,
+    result?.productName,
+    result?.identifierText,
+    result?.status,
+    review.status,
+    ...review.flags,
+    review.notes,
+    ...(Array.isArray(result?.skuGroup) ? result.skuGroup : []),
+    ...(Array.isArray(result?.productCodes) ? result.productCodes : []),
+    ...(Array.isArray(result?.imageFiles) ? result.imageFiles : []),
+    ...storeFields,
+    ...(Array.isArray(result?.previewImages) ? result.previewImages.flatMap(imageSearchFields) : [])
+  ];
+  return matchesSearchTerms(searchable, terms);
+}
+
+export function taskImageMatchesQuery(image, query = "") {
+  const terms = searchTerms(query);
+  if (!terms.length) return true;
+  return matchesSearchTerms(imageSearchFields(image), terms);
+}
+
+function imageSearchFields(image) {
+  return [
+    image?.file,
+    image?.store,
+    image?.store ? `store:${image.store}` : "",
+    image?.storeLabel
+  ];
+}
+
+function searchTerms(query) {
+  return String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function matchesSearchTerms(fields, terms) {
+  const searchable = fields.filter(Boolean).join(" ").toLowerCase();
   return terms.every((term) => searchable.includes(term));
 }
 

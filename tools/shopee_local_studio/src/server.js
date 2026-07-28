@@ -16,6 +16,7 @@ import {
   buildTaskProgress,
   describeImage2Runtime,
   expandProductCodeSkuGroup,
+  imageResultMatchesQuery,
   listProductCodeMappings,
   makeListingDraft,
   normalizeImageReview,
@@ -809,13 +810,15 @@ async function listTasks(options = {}) {
 }
 
 async function listImageResults(options = {}) {
-  const tasks = await listTasks({ ...options, includeArchived: true });
+  const tasks = await listTasks({ includeArchived: true });
   const results = [];
   for (const task of tasks) {
-    if (!shouldShowTask(task, options)) continue;
+    if (!options.includeArchived && task?.archived) continue;
     const images = await listImages(task);
     if (!images.length) continue;
-    results.push(buildImageResultSummary(task, images));
+    const result = buildImageResultSummary(task, images);
+    if (!imageResultMatchesQuery(result, options.query)) continue;
+    results.push(result);
   }
   return results.sort((a, b) => String(b.updatedAt || b.createdAt).localeCompare(String(a.updatedAt || a.createdAt)));
 }

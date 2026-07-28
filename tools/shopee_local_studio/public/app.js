@@ -5,6 +5,7 @@ let pendingParsedTask = null;
 let storeFrameStatus = null;
 let productCodeMappings = [];
 let imageResults = [];
+let taskImages = [];
 
 const taskForm = document.querySelector("#taskForm");
 const productCodeMapForm = document.querySelector("#productCodeMapForm");
@@ -25,6 +26,7 @@ const productCodeMapList = document.querySelector("#productCodeMapList");
 const imageResultSearch = document.querySelector("#imageResultSearch");
 const showArchivedResults = document.querySelector("#showArchivedResults");
 const imageResultsEl = document.querySelector("#imageResults");
+const taskImageSearch = document.querySelector("#taskImageSearch");
 
 document.querySelector("#refreshBtn").addEventListener("click", refreshAll);
 document.querySelector("#parseQuickBtn").addEventListener("click", parseQuickTask);
@@ -69,12 +71,14 @@ imageDropZone.addEventListener("drop", async (event) => {
 taskSelect.addEventListener("change", async () => {
   selectedTask = tasks.find((task) => task.id === taskSelect.value) || null;
   if (selectedTask) pendingParsedTask = null;
+  taskImageSearch.value = "";
   await renderTask();
 });
 taskSearch.addEventListener("input", async () => refreshTasks(selectedTask?.id, false));
 showArchived.addEventListener("change", async () => refreshTasks(selectedTask?.id, false));
 imageResultSearch.addEventListener("input", () => loadImageResults(false));
 showArchivedResults.addEventListener("change", () => loadImageResults(false));
+taskImageSearch.addEventListener("input", renderTaskImages);
 
 taskForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -416,6 +420,7 @@ async function renderTask() {
     await loadImages();
     await loadLogs();
   } else {
+    taskImages = [];
     imageGrid.innerHTML = '<div class="empty">\u521b\u5efa\u4efb\u52a1\u540e\u751f\u6210\u56fe\u7247</div>';
     logs.textContent = "\u5df2\u89e3\u6790\u5230\u5de6\u4fa7\u8868\u5355\u3002\u8bf7\u70b9\u51fb\u201c\u521b\u5efa\u5e76\u4e00\u952e\u5168\u6d41\u7a0b\u201d\uff0c\u624d\u4f1a\u771f\u6b63\u751f\u6210\u56fe\u7247\u5e76\u5904\u7406 BigSeller \u8349\u7a3f\u3002";
   }
@@ -762,16 +767,39 @@ function downloadSelectedTask() {
 async function loadImages() {
   if (!selectedTask) return;
   const data = await api(`/api/tasks/${selectedTask.id}/images`);
-  if (!data.images.length) {
+  taskImages = data.images || [];
+  renderTaskImages();
+}
+
+function renderTaskImages() {
+  const filteredImages = taskImages.filter((image) => taskImageMatchesSearch(image, taskImageSearch.value));
+  if (!taskImages.length) {
     imageGrid.innerHTML = '<div class="empty">&#26242;&#26080;&#22270;&#29255;</div>';
     return;
   }
-  imageGrid.innerHTML = data.images.map((image) => `
+  if (!filteredImages.length) {
+    imageGrid.innerHTML = '<div class="empty">\u6ca1\u6709\u5339\u914d\u7684\u5f53\u524d\u56fe\u7247</div>';
+    return;
+  }
+  const cacheKey = Date.now();
+  imageGrid.innerHTML = filteredImages.map((image) => `
     <div class="image-item">
-      <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
+      <img src="${image.url}&t=${cacheKey}" alt="${escapeHtml(image.file)}">
       <span>${escapeHtml(image.storeLabel)} &middot; ${escapeHtml(image.file)}</span>
     </div>
   `).join("");
+}
+
+function taskImageMatchesSearch(image, query = "") {
+  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return true;
+  const searchable = [
+    image.file,
+    image.store,
+    image.store ? `store:${image.store}` : "",
+    image.storeLabel
+  ].filter(Boolean).join(" ").toLowerCase();
+  return terms.every((term) => searchable.includes(term));
 }
 
 async function loadLogs() {

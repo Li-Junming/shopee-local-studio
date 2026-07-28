@@ -10,6 +10,7 @@ import {
   buildImageResultSummary,
   buildTaskProgress,
   expandProductCodeSkuGroup,
+  imageResultMatchesQuery,
   listProductCodeMappings,
   makeListingDraft,
   normalizeImageReview,
@@ -26,6 +27,7 @@ import {
   buildPreflightReport,
   sourceImagesMissingMessage,
   storesFor,
+  taskImageMatchesQuery,
   taskMatchesQuery,
   upsertProductCodeMapping,
   validateVietnameseListing
@@ -1099,7 +1101,11 @@ test("task management search matches product, SKU, status, and target store", ()
     skuGroup: ["YSLD80501", "YSLD80502"],
     productCodes: ["PC805"],
     status: "pipeline_done",
-    targetStores: ["7", "9"]
+    targetStores: ["7", "9"],
+    imageReview: {
+      status: "approved",
+      flags: ["layout_similar"]
+    }
   };
 
   assert.equal(taskMatchesQuery(task, "soft clean"), true);
@@ -1107,8 +1113,54 @@ test("task management search matches product, SKU, status, and target store", ()
   assert.equal(taskMatchesQuery(task, "pc805"), true);
   assert.equal(taskMatchesQuery(task, "pipeline_done"), true);
   assert.equal(taskMatchesQuery(task, "store:9"), true);
+  assert.equal(taskMatchesQuery(task, "approved"), true);
+  assert.equal(taskMatchesQuery(task, "layout_similar"), true);
   assert.equal(taskMatchesQuery(task, "kerastase"), false);
   assert.equal(taskMatchesQuery(task, ""), true);
+});
+
+test("image result search matches review state, stores, and file names", () => {
+  const result = buildImageResultSummary({
+    id: "task-001",
+    productName: "Estee Lauder Soft Clean Infusion",
+    skuGroup: ["YSLD80501"],
+    productCodes: ["PC805"],
+    targetStores: ["4", "5"],
+    status: "pipeline_done",
+    imageReview: {
+      status: "needs_regeneration",
+      flags: ["layout_similar"]
+    }
+  }, [
+    {
+      file: "store_4_skinora_care/01_product.png",
+      store: "4",
+      storeLabel: "4店 Skinora Care"
+    },
+    {
+      file: "store_5_skinora_fresh/02_effect.png",
+      store: "5",
+      storeLabel: "5店 Skinora Fresh"
+    }
+  ]);
+
+  assert.equal(imageResultMatchesQuery(result, "pc805 store:4 needs_regeneration 01_product"), true);
+  assert.equal(imageResultMatchesQuery(result, "ysld80501 layout_similar"), true);
+  assert.equal(imageResultMatchesQuery(result, "store:9"), false);
+  assert.equal(imageResultMatchesQuery(result, ""), true);
+});
+
+test("task image search matches store labels and file names", () => {
+  const image = {
+    file: "store_4_skinora_care/01_product.png",
+    store: "4",
+    storeLabel: "4店 Skinora Care"
+  };
+
+  assert.equal(taskImageMatchesQuery(image, "store:4 01_product"), true);
+  assert.equal(taskImageMatchesQuery(image, "skinora"), true);
+  assert.equal(taskImageMatchesQuery(image, "store:6"), false);
+  assert.equal(taskImageMatchesQuery(image, ""), true);
 });
 
 test("task management archive filter hides archived tasks by default", () => {
