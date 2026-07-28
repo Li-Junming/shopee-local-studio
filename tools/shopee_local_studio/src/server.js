@@ -16,6 +16,7 @@ import {
   expandProductCodeSkuGroup,
   listProductCodeMappings,
   makeListingDraft,
+  normalizeImageReview,
   normalizeSourceImages,
   parseTaskText,
   parseSkuGroup,
@@ -89,6 +90,7 @@ async function route(req, res) {
     if (parts[3] === "archive" && req.method === "POST") return sendJson(res, 200, { task: await setTaskArchived(task, true) });
     if (parts[3] === "unarchive" && req.method === "POST") return sendJson(res, 200, { task: await setTaskArchived(task, false) });
     if (parts[3] === "download" && req.method === "GET") return serveTaskDownload(res, task);
+    if (parts[3] === "image-review" && req.method === "PUT") return sendJson(res, 200, { task: await updateImageReview(task, await readJson(req)) });
     if (parts[3] === "source-check" && req.method === "POST") return sendJson(res, 200, { task: await checkSourceProduct(task) });
     if (parts[3] === "confirm-source" && req.method === "POST") return sendJson(res, 200, { task: await confirmSourceProduct(task) });
     if (parts[3] === "reject-source" && req.method === "POST") return sendJson(res, 200, { task: await rejectSourceProduct(task) });
@@ -442,6 +444,17 @@ async function updateListings(task, body) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, "Updated listing text.");
+  return task;
+}
+
+async function updateImageReview(task, body) {
+  task.imageReview = normalizeImageReview({
+    ...body,
+    updatedAt: new Date().toISOString()
+  });
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, `[image review] ${task.imageReview.status}; flags: ${task.imageReview.flags.join(", ") || "none"}; notes: ${task.imageReview.notes || "none"}`);
   return task;
 }
 

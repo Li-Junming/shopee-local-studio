@@ -333,7 +333,30 @@ export function buildImageResultSummary(task, images = []) {
     imageCount: images.length,
     storeImageCounts: [...counts.values()].sort((left, right) => left.store.localeCompare(right.store)),
     previewImages: images.slice(0, 4),
+    imageReview: normalizeImageReview(task?.imageReview || {}),
     downloadUrl: task?.id ? `/api/tasks/${task.id}/download` : ""
+  };
+}
+
+const IMAGE_REVIEW_STATUSES = new Set(["pending", "approved", "needs_regeneration", "delivered"]);
+const IMAGE_REVIEW_FLAGS = new Set(["layout_similar", "color_similar", "quality_issue", "wrong_product"]);
+
+export function normalizeImageReview(input = {}) {
+  const status = IMAGE_REVIEW_STATUSES.has(input?.status) ? input.status : "pending";
+  const seen = new Set();
+  const flags = [];
+  for (const rawFlag of Array.isArray(input?.flags) ? input.flags : []) {
+    const flag = String(rawFlag || "").trim();
+    if (IMAGE_REVIEW_FLAGS.has(flag) && !seen.has(flag)) {
+      seen.add(flag);
+      flags.push(flag);
+    }
+  }
+  return {
+    status,
+    flags,
+    notes: String(input?.notes || "").trim(),
+    updatedAt: input?.updatedAt || ""
   };
 }
 

@@ -330,6 +330,18 @@ function renderImageResults() {
       <div class="result-counts">${(result.storeImageCounts || []).map((item) => `
         <span>${escapeHtml(item.storeLabel || item.store)}: ${Number(item.count || 0)}</span>
       `).join("")}</div>
+      <div class="result-review">
+        <span class="review-state ${escapeHtml(result.imageReview?.status || "pending")}">${escapeHtml(imageReviewStatusLabel(result.imageReview?.status))}</span>
+        ${(result.imageReview?.flags || []).map((flag) => `<span class="review-flag">${escapeHtml(imageReviewFlagLabel(flag))}</span>`).join("")}
+        ${result.imageReview?.notes ? `<span class="review-note">${escapeHtml(result.imageReview.notes)}</span>` : ""}
+      </div>
+      <div class="review-actions">
+        <button type="button" data-review-status="approved">\u53ef\u7528</button>
+        <button type="button" data-review-status="needs_regeneration">\u5efa\u8bae\u91cd\u751f</button>
+        <button type="button" data-review-status="delivered">\u5df2\u4ea4\u4ed8</button>
+        <button type="button" data-review-flag="layout_similar">\u6784\u56fe\u592a\u50cf</button>
+        <button type="button" data-review-flag="color_similar">\u989c\u8272\u592a\u50cf</button>
+      </div>
       <div class="result-previews">${(result.previewImages || []).map((image) => `
         <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
       `).join("")}</div>
@@ -341,6 +353,15 @@ function renderImageResults() {
       window.location.href = `/api/tasks/${card.dataset.taskId}/download`;
     });
     card.querySelector("[data-action=archive]")?.addEventListener("click", () => archiveImageResultTask(card.dataset.taskId));
+    card.querySelectorAll("[data-review-status]").forEach((button) => {
+      button.addEventListener("click", () => updateImageReview(card.dataset.taskId, { status: button.dataset.reviewStatus, flags: [] }));
+    });
+    card.querySelectorAll("[data-review-flag]").forEach((button) => {
+      button.addEventListener("click", () => updateImageReview(card.dataset.taskId, {
+        status: "needs_regeneration",
+        flags: [button.dataset.reviewFlag]
+      }));
+    });
   });
 }
 
@@ -623,6 +644,17 @@ async function archiveImageResultTask(taskId) {
   toast(action === "archive" ? "\u7ed3\u679c\u5df2\u5f52\u6863" : "\u7ed3\u679c\u5df2\u6062\u590d");
 }
 
+async function updateImageReview(taskId, review) {
+  const data = await api(`/api/tasks/${taskId}/image-review`, {
+    method: "PUT",
+    body: JSON.stringify(review)
+  });
+  if (selectedTask?.id === taskId) selectedTask = data.task;
+  await refreshTasks(selectedTask?.id, false);
+  await loadImageResults(false);
+  toast("\u8d28\u68c0\u6807\u8bb0\u5df2\u4fdd\u5b58");
+}
+
 async function deleteSelectedTask() {
   if (!selectedTask) return;
   const message = `\u786e\u5b9a\u5220\u9664\u4efb\u52a1\uff1a${selectedTask.productName}\uff1f\n\n\u8fd9\u4f1a\u5220\u9664\u8be5\u4efb\u52a1\u76ee\u5f55\u4e0b\u7684\u56fe\u7247\u3001\u6587\u6848\u548c\u65e5\u5fd7\u3002`;
@@ -687,6 +719,21 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function imageReviewStatusLabel(status) {
+  if (status === "approved") return "\u53ef\u7528";
+  if (status === "needs_regeneration") return "\u5efa\u8bae\u91cd\u751f";
+  if (status === "delivered") return "\u5df2\u4ea4\u4ed8";
+  return "\u5f85\u8d28\u68c0";
+}
+
+function imageReviewFlagLabel(flag) {
+  if (flag === "layout_similar") return "\u6784\u56fe\u592a\u50cf";
+  if (flag === "color_similar") return "\u989c\u8272\u592a\u50cf";
+  if (flag === "quality_issue") return "\u8d28\u91cf\u95ee\u9898";
+  if (flag === "wrong_product") return "\u5546\u54c1\u4e0d\u5bf9";
+  return flag;
 }
 
 function escapeHtml(value) {

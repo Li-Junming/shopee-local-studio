@@ -10,6 +10,7 @@ import {
   expandProductCodeSkuGroup,
   listProductCodeMappings,
   makeListingDraft,
+  normalizeImageReview,
   parseTaskText,
   parseSkuGroup,
   removeProductCodeMapping,
@@ -689,6 +690,45 @@ test("buildImageResultSummary counts images by store and keeps first previews", 
     "store_9/02.png"
   ]);
   assert.equal(summary.downloadUrl, "/api/tasks/task-001/download");
+});
+
+test("normalizeImageReview keeps supported status and flags only", () => {
+  assert.deepEqual(normalizeImageReview({
+    status: "needs_regeneration",
+    flags: ["layout_similar", "bad_flag", "color_similar", "layout_similar"],
+    notes: "  too close to store 5  ",
+    updatedAt: "2026-07-28T01:00:00.000Z"
+  }), {
+    status: "needs_regeneration",
+    flags: ["layout_similar", "color_similar"],
+    notes: "too close to store 5",
+    updatedAt: "2026-07-28T01:00:00.000Z"
+  });
+
+  assert.equal(normalizeImageReview({ status: "unknown" }).status, "pending");
+});
+
+test("buildImageResultSummary includes normalized image review state", () => {
+  const summary = buildImageResultSummary({
+    id: "task-002",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["SKU-A"],
+    targetStores: ["7"],
+    imageReview: {
+      status: "delivered",
+      flags: ["layout_similar", "bad_flag"],
+      notes: "sent to boss"
+    }
+  }, [
+    { store: "7", storeLabel: "Store 7", file: "store_7/01.png", url: "/image/1" }
+  ]);
+
+  assert.deepEqual(summary.imageReview, {
+    status: "delivered",
+    flags: ["layout_similar"],
+    notes: "sent to boss",
+    updatedAt: ""
+  });
 });
 
 test("buildImage2CliArgs adds overwrite only when requested", () => {

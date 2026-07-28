@@ -326,6 +326,60 @@ button.danger {
   background: #f8fafc;
 }
 
+.result-review,
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.review-state,
+.review-flag,
+.review-note {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.review-state.pending {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.review-state.approved {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.review-state.needs_regeneration {
+  background: #fff7ed;
+  color: #b54708;
+}
+
+.review-state.delivered {
+  background: #eef4ff;
+  color: #3538cd;
+}
+
+.review-flag {
+  background: #fff1f3;
+  color: #c01048;
+}
+
+.review-note {
+  background: #f8fafc;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.review-actions button {
+  min-height: 28px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
 .result-previews {
   display: grid;
   grid-template-columns: repeat(4, minmax(54px, 1fr));
