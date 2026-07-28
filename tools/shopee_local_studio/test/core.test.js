@@ -1036,11 +1036,6 @@ test("buildTaskProgress explains waiting source confirmation", () => {
   assert.equal(progress.stage, "source_review");
   assert.equal(progress.level, "action");
   assert.match(progress.nextAction, /\u786e\u8ba4/);
-  assert.deepEqual(progress.primaryAction, {
-    action: "confirm-source-and-run",
-    label: "\u786e\u8ba4\u5e76\u7ee7\u7eed",
-    toast: "\u5df2\u786e\u8ba4\uff0c\u81ea\u52a8\u6d41\u7a0b\u7ee7\u7eed\u8fd0\u884c"
-  });
 });
 
 test("buildTaskProgress maps active pipeline stages", () => {
@@ -1064,27 +1059,6 @@ test("buildTaskProgress maps done and failure states", () => {
   assert.equal(failed.stage, "failed");
   assert.equal(failed.level, "error");
   assert.match(failed.message, /Missing OPENAI_API_KEY/);
-});
-
-test("buildTaskProgress returns primary actions for common workflow states", () => {
-  const ready = buildTaskProgress({
-    status: "source_confirmed",
-    sourceReviewRequired: true,
-    sourceConfirmedAt: "2026-07-28T01:00:00.000Z",
-    sourceImages: ["C:/task/source-images/01.jpg"]
-  }, {
-    preflight: { status: "ready", blockers: [], warnings: [] }
-  });
-  const done = buildTaskProgress({ status: "pipeline_done" });
-  const imageFailed = buildTaskProgress({ status: "image2_failed" });
-  const discoverFailed = buildTaskProgress({ status: "bigseller_discover_failed" });
-  const saveFailed = buildTaskProgress({ status: "bigseller_save_failed" });
-
-  assert.equal(ready.primaryAction.action, "run-all");
-  assert.equal(done.primaryAction.action, "download");
-  assert.equal(imageFailed.primaryAction.action, "regenerate-images");
-  assert.equal(discoverFailed.primaryAction.action, "discover");
-  assert.equal(saveFailed.primaryAction.action, "save");
 });
 
 test("task management search matches product, SKU, status, and target store", () => {

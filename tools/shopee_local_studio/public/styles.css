@@ -609,18 +609,6 @@ button.danger {
   margin: 0;
 }
 
-.pipeline-progress-action {
-  justify-self: start;
-  min-height: 34px;
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.pipeline-progress-action:hover {
-  background: var(--accent-strong);
-}
-
 .preflight-panel:empty {
   display: none;
 }

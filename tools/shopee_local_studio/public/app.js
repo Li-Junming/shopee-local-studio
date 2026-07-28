@@ -485,23 +485,8 @@ function renderPipelineProgress(progress) {
         <span>\u4e0b\u4e00\u6b65</span>
         <strong>${escapeHtml(progress.nextAction || "\u67e5\u770b\u65e5\u5fd7\u6216\u5237\u65b0\u72b6\u6001\u3002")}</strong>
       </div>
-      ${progress.primaryAction ? `
-        <button class="pipeline-progress-action" type="button" data-progress-action="${escapeHtml(progress.primaryAction.action)}">
-          ${escapeHtml(progress.primaryAction.label || "\u6267\u884c")}
-        </button>
-      ` : ""}
     </div>
   `;
-  panel.querySelector("[data-progress-action]")?.addEventListener("click", () => runProgressAction(progress.primaryAction));
-}
-
-function runProgressAction(action) {
-  if (!action?.action) return;
-  if (action.action === "download") {
-    downloadSelectedTask();
-    return;
-  }
-  postTaskAction(action.action, action.toast || "\u5df2\u63d0\u4ea4");
 }
 
 function progressStageLabel(stage) {
