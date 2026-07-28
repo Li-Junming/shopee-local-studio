@@ -12,6 +12,7 @@ import {
   buildImage2Config,
   buildImageResultSummary,
   buildPreflightReport,
+  buildTaskProgress,
   describeImage2Runtime,
   expandProductCodeSkuGroup,
   listProductCodeMappings,
@@ -98,7 +99,10 @@ async function route(req, res) {
     if (parts[3] === "reject-source" && req.method === "POST") return sendJson(res, 200, { task: await rejectSourceProduct(task) });
     if (parts[3] === "source-images" && req.method === "GET") return sendJson(res, 200, { images: await listSourceImages(task), review: sourceReviewState(task) });
     if (parts[3] === "source-image" && req.method === "GET") return serveSourceImage(res, task, url.searchParams.get("file"));
-    if (parts[3] === "preflight" && req.method === "GET") return sendJson(res, 200, { preflight: await taskPreflight(task) });
+    if (parts[3] === "preflight" && req.method === "GET") {
+      const preflight = await taskPreflight(task);
+      return sendJson(res, 200, { preflight, progress: buildTaskProgress(task, { preflight }) });
+    }
     if (parts[3] === "listings" && req.method === "PUT") return sendJson(res, 200, { task: await updateListings(task, await readJson(req)) });
     if (parts[3] === "regenerate-listings" && req.method === "POST") return sendJson(res, 200, { task: await regenerateListings(task) });
     if (parts[3] === "image2-config" && req.method === "POST") return sendJson(res, 200, { task: await writeImage2Config(task) });

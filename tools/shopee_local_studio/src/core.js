@@ -517,6 +517,55 @@ export function pipelineStartBlockers(preflight = {}) {
   return (preflight.blockers || []).filter((item) => item.id !== "source_lookup_needed");
 }
 
+export function buildTaskProgress(task = {}, context = {}) {
+  const status = String(task?.status || "created");
+  const preflight = context.preflight || {};
+  const blockers = preflight.blockers || [];
+  const blockerMessage = blockers.map((item) => item.message).filter(Boolean).join(" ");
+  const sourceState = sourceReviewState(task);
+
+  if (status === "pipeline_done") {
+    return progress("done", "done", "\u5df2\u5b8c\u6210", "\u81ea\u52a8\u6d41\u7a0b\u5df2\u5b8c\u6210\uff0c\u53ef\u4ee5\u5728\u7ed3\u679c\u5e93\u67e5\u770b\u5404\u5e97\u56fe\u7247\u3002", "\u68c0\u67e5\u7ed3\u679c\u56fe\uff0c\u4e0d\u6ee1\u610f\u7684\u5e97\u94fa\u53ef\u4ee5\u91cd\u751f\u3002");
+  }
+  if (isFailureStatus(status)) {
+    return progress("failed", "error", "\u6d41\u7a0b\u9700\u5904\u7406", blockerMessage || "\u540e\u53f0\u6d41\u7a0b\u5931\u8d25\u6216\u88ab\u9884\u68c0\u62e6\u622a\uff0c\u8bf7\u67e5\u770b\u65e5\u5fd7\u4e2d\u7684\u5931\u8d25\u539f\u56e0\u3002", "\u4fee\u590d\u95ee\u9898\u540e\u518d\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+  }
+  if (sourceState.required && !sourceState.ready) {
+    return progress("source_review", "action", "\u7b49\u5f85\u786e\u8ba4 1\u5e97\u5546\u54c1", "\u5df2\u627e\u5230 1\u5e97\u6765\u6e90\uff0c\u9700\u8981\u5148\u786e\u8ba4\u662f\u5426\u662f\u6b63\u786e\u5546\u54c1\u3002", "\u786e\u8ba4 1\u5e97\u5546\u54c1\u540e\uff0c\u518d\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+  }
+  if (["fetching_source_images", "source_config_ready", "pipeline_queued"].includes(status)
+    || blockers.some((item) => item.id === "source_lookup_needed")) {
+    return progress("source_lookup", "running", "\u6b63\u5728/\u7b49\u5f85\u68c0\u7d22 1\u5e97\u5546\u54c1", "\u7cfb\u7edf\u4f1a\u5148\u6839\u636e\u5546\u54c1\u7f16\u7801/SKU \u5339\u914d 1\u5e97\u5546\u54c1\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\uff0c\u68c0\u7d22\u5230\u540e\u9700\u8981\u786e\u8ba4\u5546\u54c1\u3002");
+  }
+  if (["pipeline_generating_images", "generating_images", "regenerating_images", "image2_config_ready"].includes(status)) {
+    return progress("image_generation", "running", "\u6b63\u5728\u751f\u6210\u5404\u5e97\u56fe\u7247", "\u7cfb\u7edf\u6b63\u5728\u6309 4-9 \u5e97\u8fb9\u6846\u548c\u5e97\u94fa\u98ce\u683c\u751f\u6210\u56fe\u3002", "\u7b49\u5f85\u751f\u6210\u5b8c\u6210\uff0c\u7136\u540e\u5230\u7ed3\u679c\u5e93\u6309\u5e97\u94fa\u67e5\u770b\u3002");
+  }
+  if (["pipeline_discovering_bigseller_drafts", "discovering_bigseller_drafts", "bigseller_config_ready"].includes(status)) {
+    return progress("bigseller_discover", "running", "\u6b63\u5728\u67e5\u627e BigSeller \u8349\u7a3f", "\u56fe\u7247\u6b65\u9aa4\u5df2\u5b8c\u6210\uff0c\u6b63\u5728\u5339\u914d\u5404\u5e97 BigSeller \u8349\u7a3f\u3002", "\u7b49\u5f85\u8349\u7a3f\u5339\u914d\u5b8c\u6210\u3002");
+  }
+  if (["pipeline_saving_bigseller_drafts", "saving_bigseller_drafts"].includes(status)) {
+    return progress("bigseller_save", "running", "\u6b63\u5728\u4fdd\u5b58 BigSeller \u8349\u7a3f", "\u7cfb\u7edf\u6b63\u5728\u4e0a\u4f20\u7d20\u6750\u5e76\u4fdd\u5b58\u8349\u7a3f\u3002", "\u7b49\u5f85\u4fdd\u5b58\u5b8c\u6210\u3002");
+  }
+  if (sourceState.ready && preflight.status === "ready") {
+    return progress("ready", "ready", "\u53ef\u4ee5\u5f00\u59cb\u751f\u6210", "\u5546\u54c1\u6765\u6e90\u3001\u8d8a\u5357\u6587\u6848\u3001\u5e97\u94fa\u8fb9\u6846\u548c\u751f\u56fe\u73af\u5883\u5df2\u5c31\u7eea\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+  }
+  if (preflight.status === "blocked") {
+    return progress("blocked", "error", "\u6682\u65f6\u4e0d\u80fd\u751f\u6210", blockerMessage || "\u751f\u6210\u524d\u68c0\u67e5\u6709\u963b\u65ad\u9879\u3002", "\u5148\u5904\u7406\u4e0b\u65b9\u68c0\u67e5\u9879\uff0c\u518d\u7ee7\u7eed\u3002");
+  }
+  return progress("created", "idle", "\u4efb\u52a1\u5df2\u521b\u5efa", "\u7cfb\u7edf\u5df2\u8bb0\u5f55\u5546\u54c1\u7f16\u7801/SKU \u548c\u76ee\u6807\u5e97\u94fa\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+
+  function progress(stage, level, label, message, nextAction) {
+    return { stage, level, label, message, nextAction };
+  }
+}
+
+function isFailureStatus(status) {
+  return status === "pipeline_failed"
+    || status === "preflight_blocked"
+    || status === "image2_preflight_failed"
+    || status.endsWith("_failed");
+}
+
 function listingValidationErrors(task) {
   const errors = [];
   for (const storeId of Array.isArray(task?.targetStores) ? task.targetStores : []) {

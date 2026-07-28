@@ -423,9 +423,11 @@ async function renderTask() {
 
 async function renderPreflight() {
   const panel = document.querySelector("#preflightPanel");
+  const progressPanel = document.querySelector("#pipelineProgressPanel");
   if (!panel) return;
   if (!selectedTask) {
     panel.innerHTML = "";
+    if (progressPanel) progressPanel.innerHTML = "";
     return;
   }
   const data = await api(`/api/tasks/${selectedTask.id}/preflight`).catch((error) => ({
@@ -434,9 +436,17 @@ async function renderPreflight() {
       blockers: [{ id: "preflight_error", label: "\u603b\u68c0\u67e5\u5931\u8d25", message: error.message }],
       warnings: [],
       checks: []
+    },
+    progress: {
+      stage: "blocked",
+      level: "error",
+      label: "\u72b6\u6001\u8bfb\u53d6\u5931\u8d25",
+      message: error.message,
+      nextAction: "\u5237\u65b0\u540e\u91cd\u8bd5\u3002"
     }
   }));
   const preflight = data.preflight || {};
+  renderPipelineProgress(data.progress);
   const blockers = preflight.blockers || [];
   const warnings = preflight.warnings || [];
   const items = [...blockers, ...warnings];
@@ -452,6 +462,43 @@ async function renderPreflight() {
       </div>
     `).join("") : '<div class="preflight-item ok"><strong>\u53ef\u751f\u6210</strong><span>\u6ca1\u6709\u963b\u65ad\u9879\u6216\u9ad8\u98ce\u9669\u63d0\u793a\u3002</span></div>'}</div>
   `;
+}
+
+function renderPipelineProgress(progress) {
+  const panel = document.querySelector("#pipelineProgressPanel");
+  if (!panel) return;
+  if (!progress) {
+    panel.innerHTML = "";
+    return;
+  }
+  panel.innerHTML = `
+    <div class="pipeline-progress-head">
+      <div>
+        <span>\u5f53\u524d\u6d41\u7a0b</span>
+        <strong>${escapeHtml(progress.label || "\u672a\u77e5\u72b6\u6001")}</strong>
+      </div>
+      <span class="pipeline-progress-state ${escapeHtml(progress.level || "idle")}">${escapeHtml(progressStageLabel(progress.stage))}</span>
+    </div>
+    <div class="pipeline-progress-body">
+      <p>${escapeHtml(progress.message || "")}</p>
+      <div>
+        <span>\u4e0b\u4e00\u6b65</span>
+        <strong>${escapeHtml(progress.nextAction || "\u67e5\u770b\u65e5\u5fd7\u6216\u5237\u65b0\u72b6\u6001\u3002")}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function progressStageLabel(stage) {
+  if (stage === "source_lookup") return "1\u5e97\u68c0\u7d22";
+  if (stage === "source_review") return "1\u5e97\u786e\u8ba4";
+  if (stage === "image_generation") return "\u751f\u56fe";
+  if (stage === "bigseller_discover") return "\u67e5\u627e\u8349\u7a3f";
+  if (stage === "bigseller_save") return "\u4fdd\u5b58\u8349\u7a3f";
+  if (stage === "done") return "\u5b8c\u6210";
+  if (stage === "failed" || stage === "blocked") return "\u9700\u5904\u7406";
+  if (stage === "ready") return "\u5c31\u7eea";
+  return "\u51c6\u5907";
 }
 
 function preflightLabel(status) {

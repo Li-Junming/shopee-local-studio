@@ -7,6 +7,7 @@ import {
   buildImage2CliArgs,
   buildImage2Config,
   buildImageResultSummary,
+  buildTaskProgress,
   expandProductCodeSkuGroup,
   listProductCodeMappings,
   makeListingDraft,
@@ -1023,6 +1024,41 @@ test("pipelineStartBlockers keeps runtime and source confirmation blockers", () 
   };
 
   assert.deepEqual(pipelineStartBlockers(report).map((item) => item.id), ["image_runtime", "source_review"]);
+});
+
+test("buildTaskProgress explains waiting source confirmation", () => {
+  const progress = buildTaskProgress({
+    status: "source_review_required",
+    sourceReviewRequired: true,
+    sourceImages: ["C:/task/source-images/01.jpg"]
+  });
+
+  assert.equal(progress.stage, "source_review");
+  assert.equal(progress.level, "action");
+  assert.match(progress.nextAction, /\u786e\u8ba4/);
+});
+
+test("buildTaskProgress maps active pipeline stages", () => {
+  assert.equal(buildTaskProgress({ status: "pipeline_generating_images" }).stage, "image_generation");
+  assert.equal(buildTaskProgress({ status: "pipeline_discovering_bigseller_drafts" }).stage, "bigseller_discover");
+  assert.equal(buildTaskProgress({ status: "pipeline_saving_bigseller_drafts" }).stage, "bigseller_save");
+});
+
+test("buildTaskProgress maps done and failure states", () => {
+  const done = buildTaskProgress({ status: "pipeline_done" });
+  const failed = buildTaskProgress({
+    status: "pipeline_failed"
+  }, {
+    preflight: {
+      blockers: [{ message: "Missing OPENAI_API_KEY." }]
+    }
+  });
+
+  assert.equal(done.stage, "done");
+  assert.equal(done.level, "done");
+  assert.equal(failed.stage, "failed");
+  assert.equal(failed.level, "error");
+  assert.match(failed.message, /Missing OPENAI_API_KEY/);
 });
 
 test("task management search matches product, SKU, status, and target store", () => {
