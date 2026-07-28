@@ -96,6 +96,7 @@ async function route(req, res) {
     if (parts[3] === "image-review" && req.method === "PUT") return sendJson(res, 200, { task: await updateImageReview(task, await readJson(req)) });
     if (parts[3] === "source-check" && req.method === "POST") return sendJson(res, 200, { task: await checkSourceProduct(task) });
     if (parts[3] === "confirm-source" && req.method === "POST") return sendJson(res, 200, { task: await confirmSourceProduct(task) });
+    if (parts[3] === "confirm-source-and-run" && req.method === "POST") return runFullPipelineRoute(res, await confirmSourceProduct(task));
     if (parts[3] === "reject-source" && req.method === "POST") return sendJson(res, 200, { task: await rejectSourceProduct(task) });
     if (parts[3] === "source-images" && req.method === "GET") return sendJson(res, 200, { images: await listSourceImages(task), review: sourceReviewState(task) });
     if (parts[3] === "source-image" && req.method === "GET") return serveSourceImage(res, task, url.searchParams.get("file"));

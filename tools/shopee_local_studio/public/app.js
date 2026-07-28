@@ -537,7 +537,7 @@ async function renderSourceReview(displayTask) {
       </div>
       <div class="source-actions">
         <button id="sourceCheckBtn" type="button">\u68c0\u7d22 1\u5e97\u5546\u54c1</button>
-        <button id="confirmSourceBtn" type="button" ${images.length ? "" : "disabled"}>\u786e\u8ba4\u4f7f\u7528</button>
+        <button id="confirmSourceBtn" type="button" ${images.length ? "" : "disabled"}>\u786e\u8ba4\u5e76\u7ee7\u7eed</button>
         <button id="rejectSourceBtn" class="danger" type="button" ${images.length ? "" : "disabled"}>\u4e0d\u5bf9</button>
       </div>
     </div>
@@ -559,7 +559,7 @@ async function renderSourceReview(displayTask) {
     `).join("") : '<div class="empty">\u5c1a\u672a\u83b7\u53d6 1\u5e97\u6765\u6e90\u56fe</div>'}</div>
   `;
   document.querySelector("#sourceCheckBtn")?.addEventListener("click", () => postTaskAction("source-check", "\u5df2\u63d0\u4ea4 1\u5e97\u68c0\u7d22"));
-  document.querySelector("#confirmSourceBtn")?.addEventListener("click", () => postTaskAction("confirm-source", "\u5df2\u786e\u8ba4 1\u5e97\u6765\u6e90"));
+  document.querySelector("#confirmSourceBtn")?.addEventListener("click", () => postTaskAction("confirm-source-and-run", "\u5df2\u786e\u8ba4\uff0c\u81ea\u52a8\u6d41\u7a0b\u7ee7\u7eed\u8fd0\u884c"));
   document.querySelector("#rejectSourceBtn")?.addEventListener("click", () => postTaskAction("reject-source", "\u5df2\u6807\u8bb0\u6765\u6e90\u4e0d\u5bf9"));
 }
 
