@@ -261,6 +261,52 @@ test("buildImage2Config tells each store not to reuse sibling store layouts", ()
   assert.match(store5Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of Store 4 Skinora Care/);
 });
 
+test("buildImage2Config includes stable style anchors for stores 4 through 9", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    targetStores: ["4", "5", "6", "7", "8", "9"],
+    sourceImages: ["C:/images/main.png"]
+  });
+
+  const promptFor = (folder) => config.jobs.find((job) => job.out.startsWith(`${folder}/01_product`))?.prompt || "";
+  const store4Prompt = promptFor("store_4_skinora_care");
+  const store5Prompt = promptFor("store_5_skinora_fresh");
+  const store6Prompt = promptFor("store_6_skinora_luxe");
+  const store7Prompt = promptFor("store_7_skinora");
+  const store8Prompt = promptFor("store_8_skinora_beauty");
+  const store9Prompt = promptFor("store_9_elora_skin");
+
+  assert.match(store4Prompt, /warm daily-care shelf/);
+  assert.match(store5Prompt, /fresh water-light diagonal/);
+  assert.match(store6Prompt, /premium layered hero/);
+  assert.match(store7Prompt, /pink-gold beauty counter/);
+  assert.match(store8Prompt, /clinical blue grid/);
+  assert.match(store9Prompt, /red conversion hero/);
+  assert.ok(config.jobs.every((job) => job.prompt.includes("Light self-check")));
+});
+
+test("buildImage2Config gives each image slot a distinct composition role", () => {
+  const config = buildImage2Config({
+    taskDir: "C:/tmp/task",
+    productName: "Lancome Genifique Serum",
+    skuGroup: ["LC860101"],
+    targetStores: ["4"],
+    sourceImages: ["C:/images/main.png"]
+  });
+
+  const productPrompt = config.jobs.find((job) => job.out.endsWith("/01_product.png"))?.prompt || "";
+  const effectPrompt = config.jobs.find((job) => job.out.endsWith("/02_effect.png"))?.prompt || "";
+  const realOnePrompt = config.jobs.find((job) => job.out.endsWith("/03_real.png"))?.prompt || "";
+  const realTwoPrompt = config.jobs.find((job) => job.out.endsWith("/04_real.png"))?.prompt || "";
+
+  assert.match(productPrompt, /Slot role: main product trust poster/);
+  assert.match(effectPrompt, /Slot role: benefit and usage-feel poster/);
+  assert.match(realOnePrompt, /Slot role: natural buyer proof photo/);
+  assert.match(realTwoPrompt, /Slot role: alternate buyer proof photo/);
+});
+
 test("buildImage2Config adds review-guided regeneration instructions", () => {
   const config = buildImage2Config({
     taskDir: "C:/tmp/task",

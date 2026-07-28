@@ -54,43 +54,49 @@ const STORE_DIFFERENTIATION_BY_ID = {
   4: {
     name: "gentle daily-care",
     palette: "warm ivory, soft gold, muted peach, low contrast",
-    composition: "calm centered product, rounded care modules, soft bathroom or vanity cues",
+    composition: "warm daily-care shelf composition, calm centered product, rounded care modules, soft bathroom or vanity cues",
     hook: "daily gentle care, hydration comfort, routine trust",
+    background: "soft home-care background, warm shelf shadow, subtle cream texture",
     avoid: "clinical blue layouts, red conversion blocks, dramatic luxury shadows"
   },
   5: {
     name: "fresh bright",
     palette: "clean white, fresh mint, light aqua, bright daylight",
-    composition: "airy diagonal product flow, fresh splash or leaf cues, open whitespace",
+    composition: "fresh water-light diagonal product flow, clean splash or leaf cues, open whitespace",
     hook: "freshness, quick visible feeling, clean lightweight use",
+    background: "bright daylight background, water reflection accents, airy negative space",
     avoid: "heavy gold luxury, dense red callouts, soft pink beauty layouts"
   },
   6: {
     name: "premium luxe",
     palette: "champagne gold, calm taupe, pearl white, controlled shadow",
-    composition: "premium hero close-up, layered depth, refined editorial spacing",
+    composition: "premium layered hero close-up, layered depth, refined editorial spacing",
     hook: "high-end care, refined repair feeling, giftable premium impression",
+    background: "champagne podium background, pearl highlight, controlled luxury shadow",
     avoid: "casual buyer clutter, playful pastel freshness, aggressive promo layout"
   },
   7: {
     name: "pink beauty",
     palette: "soft pink, rose gold, creamy white, elegant glow",
-    composition: "beauty-counter poster, feminine arcs, polished product highlight",
+    composition: "pink-gold beauty counter poster, feminine arcs, polished product highlight",
     hook: "elegant beauty routine, soft glow, approachable skincare",
+    background: "soft vanity background, rose-gold glow, gentle cosmetic counter cues",
     avoid: "clinical blue, strong red blocks, flat marketplace grid"
   },
   8: {
     name: "clean clinical",
     palette: "white, deep blue, silver gray, crisp contrast",
-    composition: "organized clinical blocks, clear benefit icons, precise spacing",
+    composition: "clinical blue grid layout, organized clinical blocks, clear benefit icons, precise spacing",
     hook: "professional care, clean efficacy, easy-to-scan benefits",
+    background: "white-blue lab-clean background, crisp panels, silver detail lines",
     avoid: "pink-gold elegance, warm ivory daily-care softness, red conversion styling"
   },
   9: {
     name: "bold conversion",
     palette: "white, brand red, soft gray, high clarity",
-    composition: "strong hero crop, bold benefit hierarchy, energetic ecommerce balance",
+    composition: "red conversion hero crop, bold benefit hierarchy, energetic ecommerce balance",
     hook: "fast buying confidence, visible key benefits, strong shelf impact",
+    background: "clean white-red marketplace background, strong callout zones, crisp shadows",
     avoid: "low-contrast minimalism, clinical blue systems, luxury editorial restraint"
   }
 };
@@ -2071,6 +2077,7 @@ function storeDifferentiationPrompt(store, siblingStores = []) {
     palette: store.style,
     composition: "use this store's watermark/frame reference as the layout cue",
     hook: "clear buyer-facing benefit hierarchy",
+    background: "store-specific ecommerce background",
     avoid: "copying another selected store's visual system"
   };
   const siblingNames = siblingStores.map((item) => item.label).filter(Boolean);
@@ -2078,8 +2085,10 @@ function storeDifferentiationPrompt(store, siblingStores = []) {
     `Store differentiation profile: ${profile.name}.`,
     `Palette: ${profile.palette}.`,
     `Composition: ${profile.composition}.`,
+    `Background anchor: ${profile.background}.`,
     `Primary buyer hook: ${profile.hook}.`,
     `Avoid: ${profile.avoid}.`,
+    "Light self-check: keep the same product identity, but avoid being too similar to other target stores; vary composition, background, crop, and benefit hierarchy enough for store-level differentiation.",
     siblingNames.length
       ? `Do not reuse the layout, palette, hero crop, or benefit hierarchy of ${siblingNames.join(" or ")}.`
       : "Keep this store visually distinct from other shops using the same product."
@@ -2112,14 +2121,14 @@ function imageReviewPrompt(task) {
 function productPosterPrompt(task, store, siblingStores = []) {
   return [
     basePrompt(task, store, siblingStores),
-    "Main product poster: brand and product name visible, product large, premium lighting, clear benefit bullets."
+    "Slot role: main product trust poster. Product is the largest subject, brand and product name visible, premium lighting, 2-3 clear benefit bullets, clean ecommerce trust layout."
   ].join(" ");
 }
 
 function effectPosterPrompt(task, store, siblingStores = []) {
   return [
     basePrompt(task, store, siblingStores),
-    "Effect poster: product plus realistic beauty result/usage scene, 3 concise benefit icons, integrated layout."
+    "Slot role: benefit and usage-feel poster. Product plus realistic beauty result or usage-feel scene, 3 concise benefit icons, stronger before-use/after-feel visual hierarchy, integrated layout."
   ].join(" ");
 }
 
@@ -2130,8 +2139,8 @@ function realPhotoPrompt(task, store, siblingStores = [], variant) {
     storeDifferentiationPrompt(store, siblingStores),
     imageReviewPrompt(task),
     variant === 1
-      ? "Scene: handheld or vanity tabletop photo in natural indoor light."
-      : "Scene: casual home desk or bathroom counter photo with a different angle and background.",
+      ? "Slot role: natural buyer proof photo. Scene: handheld or vanity tabletop photo in natural indoor light, simple real-use context, minimal styling."
+      : "Slot role: alternate buyer proof photo. Scene: casual home desk or bathroom counter photo with a different angle, background, crop distance, and surface material.",
     "Keep the scene natural and avoid poster text, authenticity badge, SKU, or unrelated watermark."
   ].filter(Boolean).join(" ");
 }
