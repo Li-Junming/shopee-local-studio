@@ -307,6 +307,7 @@ export function buildImage2Config(task) {
 
 export function buildImageResultSummary(task, images = []) {
   const counts = new Map();
+  const previewGroups = new Map();
   for (const image of images) {
     const key = String(image.store || "");
     const current = counts.get(key) || {
@@ -316,9 +317,20 @@ export function buildImageResultSummary(task, images = []) {
     };
     current.count += 1;
     counts.set(key, current);
+
+    const group = previewGroups.get(key) || {
+      store: key,
+      storeLabel: image.storeLabel || key,
+      count: 0,
+      previewImages: []
+    };
+    group.count += 1;
+    if (group.previewImages.length < 4) group.previewImages.push(image);
+    previewGroups.set(key, group);
   }
   const skuText = (Array.isArray(task?.skuGroup) ? task.skuGroup : []).join(" ");
   const productCodeText = (Array.isArray(task?.productCodes) ? task.productCodes : []).join(" ");
+  const sortByStore = (left, right) => left.store.localeCompare(right.store);
   return {
     id: task?.id || "",
     productName: task?.productName || "",
@@ -331,7 +343,8 @@ export function buildImageResultSummary(task, images = []) {
     createdAt: task?.createdAt || "",
     updatedAt: task?.updatedAt || "",
     imageCount: images.length,
-    storeImageCounts: [...counts.values()].sort((left, right) => left.store.localeCompare(right.store)),
+    storeImageCounts: [...counts.values()].sort(sortByStore),
+    storePreviewGroups: [...previewGroups.values()].sort(sortByStore),
     previewImages: images.slice(0, 4),
     imageReview: normalizeImageReview(task?.imageReview || {}),
     downloadUrl: task?.id ? `/api/tasks/${task.id}/download` : ""

@@ -343,9 +343,7 @@ function renderImageResults() {
         <button type="button" data-review-flag="layout_similar">\u6784\u56fe\u592a\u50cf</button>
         <button type="button" data-review-flag="color_similar">\u989c\u8272\u592a\u50cf</button>
       </div>
-      <div class="result-previews">${(result.previewImages || []).map((image) => `
-        <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
-      `).join("")}</div>
+      ${renderStorePreviewGroups(result)}
     </article>
   `).join("");
   imageResultsEl.querySelectorAll(".result-card").forEach((card) => {
@@ -365,6 +363,34 @@ function renderImageResults() {
       }));
     });
   });
+}
+
+function renderStorePreviewGroups(result) {
+  const groups = result.storePreviewGroups || [];
+  if (groups.length) {
+    return `
+      <div class="store-preview-groups">${groups.map((group) => `
+        <section class="store-preview-group">
+          <div class="store-preview-title">
+            <strong>${escapeHtml(group.storeLabel || group.store)}</strong>
+            <span>${Number(group.count || 0)} \u5f20</span>
+          </div>
+          <div class="store-preview-images">${(group.previewImages || []).map((image) => `
+            <a href="${image.url}" target="_blank" rel="noreferrer" title="${escapeHtml(image.file)}">
+              <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
+            </a>
+          `).join("")}</div>
+        </section>
+      `).join("")}</div>
+    `;
+  }
+  return `
+    <div class="result-previews">${(result.previewImages || []).map((image) => `
+      <a href="${image.url}" target="_blank" rel="noreferrer" title="${escapeHtml(image.file)}">
+        <img src="${image.url}&t=${Date.now()}" alt="${escapeHtml(image.file)}">
+      </a>
+    `).join("")}</div>
+  `;
 }
 
 async function renderTask() {

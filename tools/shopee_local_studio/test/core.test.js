@@ -711,6 +711,15 @@ test("buildImageResultSummary counts images by store and keeps first previews", 
     "store_9/01.png",
     "store_9/02.png"
   ]);
+  assert.deepEqual(summary.storePreviewGroups.map((group) => ({
+    store: group.store,
+    storeLabel: group.storeLabel,
+    count: group.count,
+    files: group.previewImages.map((image) => image.file)
+  })), [
+    { store: "7", storeLabel: "Store 7", count: 2, files: ["store_7/01.png", "store_7/02.png"] },
+    { store: "9", storeLabel: "Store 9", count: 3, files: ["store_9/01.png", "store_9/02.png", "store_9/03.png"] }
+  ]);
   assert.equal(summary.downloadUrl, "/api/tasks/task-001/download");
 });
 

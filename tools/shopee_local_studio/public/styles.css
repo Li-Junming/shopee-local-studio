@@ -386,7 +386,53 @@ button.danger {
   gap: 8px;
 }
 
-.result-previews img {
+.store-preview-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.store-preview-group {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfdff;
+  padding: 8px;
+  min-width: 0;
+}
+
+.store-preview-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 12px;
+}
+
+.store-preview-title strong,
+.store-preview-title span {
+  overflow-wrap: anywhere;
+}
+
+.store-preview-title span {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.store-preview-images {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(42px, 1fr));
+  gap: 6px;
+}
+
+.result-previews a,
+.store-preview-images a {
+  display: block;
+  min-width: 0;
+}
+
+.result-previews img,
+.store-preview-images img {
   width: 100%;
   aspect-ratio: 1 / 1;
   object-fit: cover;
