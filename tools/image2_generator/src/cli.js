@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
+import { runAdaptivePool } from "./adaptive-pool.js";
 import { normalizeConfig } from "./config.js";
-import { callImageApi } from "./image2-client.js";
+import { callImageApi, isRetryableImageError } from "./image2-client.js";
 import { shouldSkipJobOutput } from "./jobs.js";
 import { fitPngToSquare, writeImage } from "./postprocess.js";
 
@@ -28,7 +29,17 @@ async function main() {
     throw new Error("Missing OPENAI_API_KEY. Set it in environment or pass --api-key.");
   }
 
-  await runPool(config.jobs, config.concurrency, async (job) => {
+  await runAdaptivePool(config.jobs, {
+    maxConcurrency: config.concurrency,
+    fallbackConcurrency: Math.min(2, config.concurrency),
+    isRetryable: isRetryableImageError,
+    onDowngrade: ({ from, to, error }) => {
+      console.warn(`[image2] concurrency reduced ${from} -> ${to}: ${error.message}`);
+    },
+    onRequeue: ({ item }) => {
+      console.warn(`[image2] requeue ${item.name} at reduced concurrency`);
+    }
+  }, async (job) => {
     if (await shouldSkipJobOutput(job.outputPath, undefined, { overwrite: args.overwrite })) {
       console.log(`[skip] ${job.outputPath}`);
       return;
@@ -93,17 +104,6 @@ Options:
   --concurrency <n>    Override concurrent API calls
   --overwrite          Regenerate outputs even when PNG files already exist
 `);
-}
-
-async function runPool(items, concurrency, worker) {
-  let next = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (next < items.length) {
-      const item = items[next++];
-      await worker(item);
-    }
-  });
-  await Promise.all(workers);
 }
 
 main().catch((error) => {

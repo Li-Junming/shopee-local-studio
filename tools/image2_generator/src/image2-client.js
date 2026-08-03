@@ -69,7 +69,7 @@ async function callImageApiOnce({ config, job, apiKey, fetchImpl }) {
   return decodeImageResponse(body);
 }
 
-function isRetryableImageError(error) {
+export function isRetryableImageError(error) {
   const message = String(error?.message || "");
   return /Network request failed|Image API (429|500|502|503|504)\b|upstream_error|INTERNAL_ERROR/i.test(message);
 }
