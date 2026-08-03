@@ -66,6 +66,26 @@ test("does not requeue a non-retryable failure", async () => {
   assert.equal(attempts, 1);
 });
 
+test("rejects when a requeued retryable failure fails again", async () => {
+  let attempts = 0;
+
+  await assert.rejects(
+    runAdaptivePool(["unstable"], {
+      maxConcurrency: 4,
+      fallbackConcurrency: 2,
+      isRetryable: (error) => error.retryable === true
+    }, async () => {
+      attempts += 1;
+      const error = new Error(`temporary failure ${attempts}`);
+      error.retryable = true;
+      throw error;
+    }),
+    /temporary failure 2/
+  );
+
+  assert.equal(attempts, 2);
+});
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
