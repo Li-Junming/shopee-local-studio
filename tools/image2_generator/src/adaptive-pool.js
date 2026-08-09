@@ -11,12 +11,17 @@ export function runAdaptivePool(items, options, worker) {
   const isRetryable = options?.isRetryable || (() => false);
   const onDowngrade = options?.onDowngrade || (() => {});
   const onRequeue = options?.onRequeue || (() => {});
+  const onFailure = options?.onFailure || (() => {});
+  const continueOnError = Boolean(options?.continueOnError);
+  const maxRetryableFailures = optionalPositiveInteger(options?.maxRetryableFailures, "maxRetryableFailures");
   const queue = Array.from(items, (item) => ({ item, fallbackRetried: false }));
+  const failures = [];
 
   return new Promise((resolve, reject) => {
     let concurrency = maxConcurrency;
     let active = 0;
     let fatalError = null;
+    let retryableFailures = 0;
     let settled = false;
 
     const schedule = () => {
@@ -30,7 +35,7 @@ export function runAdaptivePool(items, options, worker) {
       }
       if (queue.length === 0 && active === 0) {
         settled = true;
-        resolve();
+        resolve({ failures });
         return;
       }
 
@@ -54,7 +59,15 @@ export function runAdaptivePool(items, options, worker) {
               onRequeue({ item: entry.item, error });
               queue.unshift(entry);
             } else {
-              fatalError = error;
+              failures.push({ item: entry.item, error });
+              onFailure({ item: entry.item, error });
+              if (isRetryable(error)) {
+                retryableFailures += 1;
+                if (maxRetryableFailures && retryableFailures >= maxRetryableFailures) {
+                  fatalError = new Error(`Too many retryable failures (${retryableFailures}); image API appears unstable. Last error: ${error.message}`);
+                }
+              }
+              if (!continueOnError) fatalError = error;
             }
             schedule();
           });
@@ -71,4 +84,9 @@ function positiveInteger(value, name) {
     throw new TypeError(`${name} must be an integer >= 1`);
   }
   return number;
+}
+
+function optionalPositiveInteger(value, name) {
+  if (value === undefined || value === null || value === "") return 0;
+  return positiveInteger(value, name);
 }

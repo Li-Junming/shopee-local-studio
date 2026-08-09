@@ -15,6 +15,21 @@ test("matches store names even when BigSeller spacing differs", () => {
   assert.equal(identifyStore("Shopee > 编辑产品 姐夫9店（胡）", storeMap).folder, "store_9_elora_skin");
 });
 
+test("falls back to the discovered job name when the edit page omits store text", () => {
+  const readableStoreMap = [
+    { match: "\u59d0\u592b 4\u5e97\uff08\u80e1\uff09", folder: "store_4_skinora_care" },
+    { match: "\u59d0\u592b 5\u5e97\uff08\u80e1\uff09", folder: "store_5_skinora_fresh" }
+  ];
+
+  const store = identifyStore(
+    "Shopee edit product page without a visible shop label",
+    readableStoreMap,
+    "Estee Lauder Micro Essence - \u59d0\u592b 4\u5e97\uff08\u80e1\uff09"
+  );
+
+  assert.equal(store.folder, "store_4_skinora_care");
+});
+
 test("throws a useful error when the store cannot be matched", () => {
   assert.throws(
     () => identifyStore("店铺：姐夫5店（胡）", storeMap),

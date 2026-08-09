@@ -29,15 +29,20 @@ async function main() {
     throw new Error("Missing OPENAI_API_KEY. Set it in environment or pass --api-key.");
   }
 
-  await runAdaptivePool(config.jobs, {
+  const result = await runAdaptivePool(config.jobs, {
     maxConcurrency: config.concurrency,
     fallbackConcurrency: Math.min(2, config.concurrency),
     isRetryable: isRetryableImageError,
+    continueOnError: true,
+    maxRetryableFailures: config.maxRetryableFailures,
     onDowngrade: ({ from, to, error }) => {
       console.warn(`[image2] concurrency reduced ${from} -> ${to}: ${error.message}`);
     },
     onRequeue: ({ item }) => {
       console.warn(`[image2] requeue ${item.name} at reduced concurrency`);
+    },
+    onFailure: ({ item, error }) => {
+      console.error(`[image2] failed ${item.name}: ${error.message}`);
     }
   }, async (job) => {
     if (await shouldSkipJobOutput(job.outputPath, undefined, { overwrite: args.overwrite })) {
@@ -53,6 +58,11 @@ async function main() {
     await fitPngToSquare(job.outputPath, config.outputSize);
     console.log(`[done] ${job.outputPath}`);
   });
+
+  if (result.failures.length > 0) {
+    const names = result.failures.map(({ item }) => item.name).join(", ");
+    throw new Error(`${result.failures.length} image job(s) failed after retries: ${names}`);
+  }
 }
 
 function parseArgs(argv) {
@@ -78,6 +88,7 @@ function printPlan(config) {
     size: config.size,
     outputSize: config.outputSize,
     concurrency: config.concurrency,
+    maxRetryableFailures: config.maxRetryableFailures,
     overwrite: Boolean(config.overwrite),
     jobs: config.jobs.map((job) => ({
       name: job.name,

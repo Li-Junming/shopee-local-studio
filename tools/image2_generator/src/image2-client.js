@@ -13,11 +13,11 @@ export function decodeImageResponse(body) {
   throw new Error("Image response did not include data[0].b64_json. Configure the API to return base64 output.");
 }
 
-export async function callImageApi({ config, job, apiKey, fetchImpl = fetch, maxAttempts = 3, retryDelayMs = 2500 }) {
+export async function callImageApi({ config, job, apiKey, fetchImpl = fetch, maxAttempts = 3, retryDelayMs = 2500, timeoutMs = 90000 }) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      return await callImageApiOnce({ config, job, apiKey, fetchImpl });
+      return await callImageApiOnce({ config, job, apiKey, fetchImpl, timeoutMs });
     } catch (error) {
       lastError = error;
       if (attempt >= maxAttempts || !isRetryableImageError(error)) break;
@@ -29,7 +29,7 @@ export async function callImageApi({ config, job, apiKey, fetchImpl = fetch, max
   throw lastError;
 }
 
-async function callImageApiOnce({ config, job, apiKey, fetchImpl }) {
+async function callImageApiOnce({ config, job, apiKey, fetchImpl, timeoutMs }) {
   const url = makeApiUrl(config.baseUrl, job.endpoint);
   const headers = { Authorization: `Bearer ${apiKey}` };
   let response;
@@ -43,13 +43,13 @@ async function callImageApiOnce({ config, job, apiKey, fetchImpl }) {
         const blob = new Blob([bytes], { type: mimeTypeFor(imagePath) });
         form.append(job.imageField, blob, path.basename(imagePath));
       }
-      response = await fetchImpl(url, { method: "POST", headers, body: form });
+      response = await fetchWithTimeout(fetchImpl, url, { method: "POST", headers, body: form }, timeoutMs);
     } else {
-      response = await fetchImpl(url, {
+      response = await fetchWithTimeout(fetchImpl, url, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
         body: JSON.stringify(commonPayload(job))
-      });
+      }, timeoutMs);
     }
   } catch (error) {
     const cause = error?.cause?.message || error?.message || String(error);
@@ -71,11 +71,23 @@ async function callImageApiOnce({ config, job, apiKey, fetchImpl }) {
 
 export function isRetryableImageError(error) {
   const message = String(error?.message || "");
-  return /Network request failed|Image API (429|500|502|503|504)\b|upstream_error|INTERNAL_ERROR/i.test(message);
+  return /Network request failed|timed out|Image API (429|500|502|503|504)\b|upstream_error|INTERNAL_ERROR/i.test(message);
 }
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithTimeout(fetchImpl, url, options, timeoutMs) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Image API request timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    return await Promise.race([fetchImpl(url, options), timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function commonPayload(job) {

@@ -5,13 +5,13 @@ export const STORE_DEFINITIONS = [
     id: "4",
     label: "Store 4 Skinora Care",
     folder: "store_4_skinora_care",
-    style: "warm ivory and soft gold Skinora ecommerce poster, gentle hydration and daily-care layout"
+    style: "clean white-gray and soft blue Skinora Care ecommerce poster, TOP BEAUTY PICKS trust layout"
   },
   {
     id: "5",
     label: "Store 5 Skinora Fresh",
     folder: "store_5_skinora_fresh",
-    style: "fresh clean Skinora ecommerce poster, airy bright layout with clear usage-feel benefits"
+    style: "fresh clean Scent & Glow ecommerce poster, soft pink-white store frame, polished Shopee beauty design"
   },
   {
     id: "6",
@@ -29,7 +29,7 @@ export const STORE_DEFINITIONS = [
     id: "8",
     label: "Store 8 Skinora Beauty",
     folder: "store_8_skinora_beauty",
-    style: "clean white and deep blue Skinora Beauty ecommerce poster, premium clinical layout"
+    style: "Skinora Beauty natural integrated Shopee ecommerce poster, light navy store identity, soft white-blue beauty background, natural product-and-box hero"
   },
   {
     id: "9",
@@ -40,6 +40,7 @@ export const STORE_DEFINITIONS = [
 ];
 
 export const DEFAULT_TARGET_STORE_IDS = STORE_DEFINITIONS.map((store) => store.id);
+const MAX_IMAGE_REFERENCE_SOURCE_IMAGES = 2;
 
 const BIGSELLER_STORE_MATCH_BY_ID = {
   4: "\u59d0\u592b 4\u5e97\uff08\u80e1\uff09",
@@ -53,27 +54,30 @@ const BIGSELLER_STORE_MATCH_BY_ID = {
 const STORE_DIFFERENTIATION_BY_ID = {
   4: {
     name: "gentle daily-care",
-    palette: "warm ivory, soft gold, muted peach, low contrast",
-    composition: "warm daily-care shelf composition, calm centered product, rounded care modules, soft bathroom or vanity cues",
-    hook: "daily gentle care, hydration comfort, routine trust",
-    background: "soft home-care background, warm shelf shadow, subtle cream texture",
-    avoid: "clinical blue layouts, red conversion blocks, dramatic luxury shadows"
+    palette: "clean white, soft gray, light shadow, small orange-red promo accent only from the target frame",
+    composition: "same visual family as Store 4 01_product: white-gray podium layout, pale circular backdrop, blue-accent benefit icons, orange-red TOP BEAUTY PICKS corner, and bottom blue authenticity promise bar",
+    hook: "official trust, best-seller confidence, clean product presentation",
+    background: "white-gray studio podium, pale circular backdrop, subtle white leaf shadow in the upper-right",
+    frame: "Preserve Store 4 target-frame cues: TOP BEAUTY PICKS orange-red corner label, Best Seller tag, white-gray podium, pale circle backdrop, bottom authenticity promise area.",
+    avoid: "beige poster, cream-gold poster, champagne benefit cards, warm-gold benefit cards, Doudou/source-store logo, floral vanity props, dense rounded care modules"
   },
   5: {
     name: "fresh bright",
-    palette: "clean white, fresh mint, light aqua, bright daylight",
-    composition: "fresh water-light diagonal product flow, clean splash or leaf cues, open whitespace",
+    palette: "soft pink and white Scent & Glow target frame palette, light cosmetic glow, restrained pastel accents from the target frame",
+    composition: "same Scent & Glow store template family across 01_product and 02_effect: keep the top label, soft pink-white frame feeling, airy product space, balanced benefit blocks, and ecommerce design polish; do not force an aqua bottom band",
     hook: "freshness, quick visible feeling, clean lightweight use",
-    background: "bright daylight background, water reflection accents, airy negative space",
-    avoid: "heavy gold luxury, dense red callouts, soft pink beauty layouts"
+    background: "soft pink-to-white ecommerce beauty background guided by the target frame, clean product space, no blue clinical grid",
+    frame: "Preserve Store 5 target frame cues: Scent & Glow top label, soft pink-white store border treatment, airy middle product space, polished Shopee beauty layout.",
+    avoid: "heavy gold luxury, dense red callouts, Doudou/source-store logo, blue clinical card layout, unrelated second-template layout, forced aqua footer band"
   },
   6: {
     name: "premium luxe",
-    palette: "champagne gold, calm taupe, pearl white, controlled shadow",
-    composition: "premium layered hero close-up, layered depth, refined editorial spacing",
+    palette: "cream, champagne gold, bright yellow bottom commitment bar, small red hot-sale accent",
+    composition: "Laura Skin Care target-frame layout with gold frame, open cream center, bottom yellow commitment bar and premium display spacing",
     hook: "high-end care, refined repair feeling, giftable premium impression",
-    background: "champagne podium background, pearl highlight, controlled luxury shadow",
-    avoid: "casual buyer clutter, playful pastel freshness, aggressive promo layout"
+    background: "cream-gold framed poster, subtle bubble highlight, polished but not source-store styling",
+    frame: "Preserve Store 6 target-frame cues: Laura Skin Care logo area, gold frame, bottom yellow commitment bar, small hot-sale badge.",
+    avoid: "Doudou/source-store logo, plain beige poster without target labels, casual buyer clutter, playful pastel freshness"
   },
   7: {
     name: "pink beauty",
@@ -84,12 +88,13 @@ const STORE_DIFFERENTIATION_BY_ID = {
     avoid: "clinical blue, strong red blocks, flat marketplace grid"
   },
   8: {
-    name: "clean clinical",
-    palette: "white, deep blue, silver gray, crisp contrast",
-    composition: "clinical blue grid layout, organized clinical blocks, clear benefit icons, precise spacing",
-    hook: "professional care, clean efficacy, easy-to-scan benefits",
-    background: "white-blue lab-clean background, crisp panels, silver detail lines",
-    avoid: "pink-gold elegance, warm ivory daily-care softness, red conversion styling"
+    name: "Skinora Beauty ecommerce frame",
+    palette: "white, navy blue, pale blue, silver gray, clean ecommerce contrast with softer edges",
+    composition: "same visual family as Store 8 Skinora Beauty: Skinora Beauty dark navy brand tab, light Skinora Beauty frame, natural integrated ecommerce hero, bottle and box arranged with believable spacing, 2-3 short ecommerce selling points, soft contact shadow, rounded promo sticker, and reduced pasted-together separation",
+    hook: "premium store trust, shop-ready product proof, simple buyer benefits",
+    background: "soft white-blue ecommerce beauty background with subtle panels and natural shadows; shop-ready, not a laboratory scene and not a specification sheet",
+    frame: "Preserve Store 8 target frame cues lightly: Skinora Beauty dark navy brand tab, light white card edge, subtle navy accents, pale-blue accent panels, small rounded promo sticker.",
+    avoid: "No dense parameter table, manual-style spec page, tiny text-heavy grid, rigid centered catalog layout, hard separated product cutout, or obvious pasted collage. Avoid lab water droplets, test tubes, molecule graphics, hydro splash, clinical laboratory scene, pure medical information grid, pink-gold elegance, warm ivory daily-care softness, red conversion styling"
   },
   9: {
     name: "bold conversion",
@@ -98,6 +103,45 @@ const STORE_DIFFERENTIATION_BY_ID = {
     hook: "fast buying confidence, visible key benefits, strong shelf impact",
     background: "clean white-red marketplace background, strong callout zones, crisp shadows",
     avoid: "low-contrast minimalism, clinical blue systems, luxury editorial restraint"
+  }
+};
+
+const STORE_SLOT_COMPOSITION_BY_ID = {
+  4: {
+    product: "lower-center hero on a low white-gray podium with a pale circle behind it, copy above-left and small benefits below-right",
+    effect: "same visual family as Store 4 01_product: product on a white-gray podium with pale circular backdrop, TOP BEAUTY PICKS corner label, blue-accent benefit icons on the right, and the bottom blue authenticity promise bar; No beige, cream-gold, champagne, or warm-gold benefit cards",
+    real1: "daylight windowsill medium shot from eye level with the product upright beside one plain glass and a softly blurred room behind",
+    real2: "top-down flat lay on a folded white towel with the product placed diagonally beside one neutral bathroom object and no hand"
+  },
+  5: {
+    product: "same Scent & Glow store template family as Store 5 02_effect: right-third hero with the same exact source product set inside an airy pink-white ecommerce frame; show the bottle plus retail box when both are present, keep left-aligned copy, soft pink store-header feeling, balanced benefit blocks, ecommerce design polish, and do not force an aqua bottom band",
+    effect: "same Scent & Glow store template family as Store 5 01_product: product hero and beauty-result area integrated inside the same soft pink-white ecommerce frame; keep the Scent & Glow store label, similar border rhythm, balanced benefit blocks, ecommerce design polish, and do not switch to a different template",
+    real1: "forty-five-degree bathroom sink corner shot with the product near the faucet, soft morning light and open counter space",
+    real2: "casual seated-hand close-up near balcony daylight with the product held low in frame and greenery softly blurred behind"
+  },
+  6: {
+    product: "strictly symmetrical center hero on an elevated champagne pedestal with title above, gold frame breathing room and one benefit line below",
+    effect: "tight product crop on the left third with a luminous ingredient halo on the right and three refined gold benefit markers stacked vertically",
+    real1: "warm bedside vanity shot from a low camera angle with the product in the foreground and a small lamp forming soft background bokeh",
+    real2: "eye-level open cabinet shelf photo with the product centered among a few neutral skincare items under warm domestic light"
+  },
+  7: {
+    product: "left-third hero wrapped by rose-gold arcs with the title and benefit stack on the open right half",
+    effect: "beauty-result close-up occupying the left half with the product standing in the lower-right and small curved benefit labels between them",
+    real1: "dresser mirror-reflection composition with the product sharp in the foreground and its soft reflection offset behind",
+    real2: "travel-pouch flat lay viewed from above with the product partly outside the pouch, natural daylight and two simple personal items"
+  },
+  8: {
+    product: "right-third hero as a natural integrated ecommerce hero with the same exact source product set; show the bottle plus retail box when both are present, use a slightly angled or offset product arrangement on a soft white-blue surface, add a Skinora Beauty dark navy brand tab and light Skinora Beauty frame, soft contact shadow, one rounded promo sticker, and only 2-3 short ecommerce selling points on the left; reduce pasted-together separation, avoid rigid centered catalog layout, make it shop-ready and not a specification sheet; No dense parameter table, manual-style spec page, or tiny text-heavy grid; No lab water droplets, test tubes, molecule graphics, hydro splash, or clinical laboratory scene",
+    effect: "same visual family as Store 8 Skinora Beauty: same exact source product set plus a clean skin-result area blended into the background inside a light Skinora Beauty frame; show the bottle plus retail box when both are present, use a natural integrated ecommerce hero with soft contact shadow, add a Skinora Beauty dark navy brand tab, subtle navy accents, benefit modules blended into the background, one rounded promo sticker, and only 2-3 short ecommerce selling points; reduce pasted-together separation, avoid rigid centered catalog layout, make it shop-ready and not a specification sheet; No dense parameter table, manual-style spec page, or tiny text-heavy grid; No lab water droplets, test tubes, molecule graphics, hydro splash, or clinical laboratory scene",
+    real1: "front-on cool-white bathroom shelf shot using tile lines for symmetry with the product slightly off-center and no hand",
+    real2: "overhead clean glass-tray photo with the product angled beside cotton pads and one silver detail under cool daylight"
+  },
+  9: {
+    product: "oversized diagonal hero rising from lower-left toward upper-center with a bold red headline block on the right and strong shelf-impact shadow",
+    effect: "product locked into the lower-right corner with large stacked benefit typography on the left and energetic red callout bars crossing the middle",
+    real1: "handheld close crop beside a bright window against a plain wall with the product high in frame and the hand entering from below",
+    real2: "low camera angle on an everyday work desk with the product in the left foreground and a keyboard plus mug softly blurred behind"
   }
 };
 
@@ -122,6 +166,24 @@ export function parseSkuGroup(input) {
     }
   }
   return skus;
+}
+
+export function parseBigSellerItemIds(input) {
+  return parseSkuGroup(input).filter((value) => /^\d{8,20}$/.test(value));
+}
+
+export function extractBigSellerItemIdsFromText(text) {
+  const seen = new Set();
+  const ids = [];
+  const pattern = /\bItem\s*ID\s*[:：]?\s*(\d{8,20})/gi;
+  for (const match of String(text || "").matchAll(pattern)) {
+    const id = match[1];
+    if (!seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  return ids;
 }
 
 export function expandProductCodeSkuGroup(input, productCodeMap = {}) {
@@ -249,7 +311,7 @@ export function parseTaskText(input) {
 
   if (imageLines.length) fields.sourceImages = imageLines.filter(Boolean).join("\n");
   if (noteLines.length) fields.notes = [fields.notes, ...noteLines].filter(Boolean).join("\n");
-  if (fields.skuGroup.length === 0) fields.skuGroup = extractSkuTokens(input);
+  if (fields.skuGroup.length === 0) fields.skuGroup = extractSkuTokens(input, { allowNumericItemIds: true });
   return fields;
 
   function applyField(key, value) {
@@ -272,6 +334,7 @@ export function normalizeSourceImages(imagePaths) {
 export function buildImage2Config(task) {
   const stores = storesFor(task.targetStores);
   const sourceImages = task.sourceImages || [];
+  const referenceSourceImages = sourceImages.slice(0, MAX_IMAGE_REFERENCE_SOURCE_IMAGES);
   const storeFrames = task.storeFrames || {};
   const hasSourceImages = sourceImages.length > 0;
   if (!hasSourceImages && !task.allowFallbackIdentity) {
@@ -288,10 +351,10 @@ export function buildImage2Config(task) {
   const jobs = [];
   for (const store of stores) {
     const siblingStores = stores.filter((item) => item.id !== store.id);
-    jobs.push(makeJob(store, "01_product.png", productPosterPrompt(safeTask, store, siblingStores)));
-    jobs.push(makeJob(store, "02_effect.png", effectPosterPrompt(safeTask, store, siblingStores)));
-    jobs.push(makeJob(store, "03_real.png", realPhotoPrompt(safeTask, store, siblingStores, 1)));
-    jobs.push(makeJob(store, "04_real.png", realPhotoPrompt(safeTask, store, siblingStores, 2)));
+    jobs.push(makeJob(store, "01_product.png", productPosterPrompt(safeTask, store, siblingStores), { useFrame: true }));
+    jobs.push(makeJob(store, "02_effect.png", effectPosterPrompt(safeTask, store, siblingStores), { useFrame: true }));
+    jobs.push(makeJob(store, "03_real.png", realPhotoPrompt(safeTask, store, siblingStores, 1), { useFrame: false }));
+    jobs.push(makeJob(store, "04_real.png", realPhotoPrompt(safeTask, store, siblingStores, 2), { useFrame: false }));
   }
 
   return {
@@ -305,14 +368,15 @@ export function buildImage2Config(task) {
     jobs
   };
 
-  function makeJob(store, fileName, prompt) {
+  function makeJob(store, fileName, prompt, options = {}) {
     const framePath = storeFramePath(storeFrames, store.id);
-    const images = framePath ? [...sourceImages, framePath] : sourceImages;
+    const useFrame = options.useFrame !== false;
+    const images = useFrame && framePath ? [...referenceSourceImages, framePath] : referenceSourceImages;
     return {
       name: `${store.folder}_${fileName.replace(".png", "")}`,
       out: `${store.folder}/${fileName}`,
       endpoint: images.length > 0 ? "edits" : "generations",
-      prompt: framePath ? addStoreFramePrompt(prompt) : prompt,
+      prompt: useFrame && framePath ? addStoreFramePrompt(prompt, store) : prompt,
       images
     };
   }
@@ -426,10 +490,10 @@ function storeFramePath(storeFrames, storeId) {
   return value.path || "";
 }
 
-function addStoreFramePrompt(prompt) {
+function addStoreFramePrompt(prompt, store) {
   return [
     prompt,
-    "Use the target store watermark/frame reference as this store's visual identity, border treatment, and layout cue while keeping the product packaging accurate."
+    targetFramePrompt(store)
   ].join(" ");
 }
 
@@ -541,6 +605,15 @@ export function sourceReviewState(task) {
   };
 }
 
+export function shouldAutoConfirmSource(task) {
+  if (!task?.sourceReviewRequired) return false;
+  if (task?.sourceConfirmedAt || task?.sourceRejectedAt) return false;
+  if (!Array.isArray(task?.sourceImages) || task.sourceImages.length === 0) return false;
+  if (parseSkuGroup(task?.sourceDraftSkuGroup).length === 0) return false;
+  if (!sourceStoreEvidencePresent(task)) return false;
+  return sourceSkuMatchRisk(task).level === "strong";
+}
+
 export function assertSourceReviewReady(task) {
   const state = sourceReviewState(task);
   if (!state.ready) {
@@ -554,8 +627,13 @@ export function buildPreflightReport(task, context = {}) {
   const warnings = [];
   const runtime = context.runtime || {};
   const sourceState = sourceReviewState(task);
+  const generatedImageCount = Number(context.generatedImageCount || 0);
+  const expectedImageCount = expectedGeneratedImageCount(task);
+  const completeGeneratedImageSet = expectedImageCount > 0 && generatedImageCount >= expectedImageCount;
 
-  if (sourceState.required && !sourceState.ready) {
+  if (sourceState.required && !sourceState.ready && shouldAutoConfirmSource(task)) {
+    add("source_auto_confirmable", "ok", "Source can auto-confirm", "Strong Item ID/SKU evidence and draft SKU were found.");
+  } else if (sourceState.required && !sourceState.ready) {
     add("source_review", "blocker", "1-store source needs confirmation", "Confirm the 1-store source product before generating images.");
   } else if (!sourceState.required && !sourceState.imageCount && !task?.sourceFallback) {
     add("source_lookup_needed", "blocker", "1-store source not checked", "Run 1-store source lookup or upload source images before generating.");
@@ -563,7 +641,9 @@ export function buildPreflightReport(task, context = {}) {
     add("source_review", "ok", "Source is ready", "Source image requirement is satisfied.");
   }
 
-  if (!runtime.apiKeySet || runtime.invalidBaseUrl || runtime.localProxyReachable === false) {
+  if ((!runtime.apiKeySet || runtime.invalidBaseUrl || runtime.localProxyReachable === false) && completeGeneratedImageSet) {
+    add("image_runtime_skipped", "ok", "Image runtime can be skipped", "A complete generated image set already exists and will be reused.");
+  } else if (!runtime.apiKeySet || runtime.invalidBaseUrl || runtime.localProxyReachable === false) {
     const message = runtime.invalidBaseUrl
       ? `Invalid OPENAI_BASE_URL: ${runtime.baseUrl}`
       : (runtime.localProxyReachable === false
@@ -581,9 +661,9 @@ export function buildPreflightReport(task, context = {}) {
     add("listing_valid", "ok", "Vietnamese listing copy is valid", "All target store title/detail text passed validation.");
   }
 
-  if (sourceState.matchRisk.level === "high") {
+  if (!sourceState.ready && !shouldAutoConfirmSource(task) && sourceState.matchRisk.level === "high") {
     add("source_sku_high_risk", "warning", "Source SKU match is high risk", sourceState.matchRisk.message);
-  } else if (sourceState.matchRisk.level === "normal") {
+  } else if (!sourceState.ready && !shouldAutoConfirmSource(task) && sourceState.matchRisk.level === "normal") {
     add("source_sku_normal_risk", "info", "Source SKU match is normal", sourceState.matchRisk.message);
   }
 
@@ -594,8 +674,9 @@ export function buildPreflightReport(task, context = {}) {
     add("store_frames_ready", "ok", "Store frames are ready", "All target stores have matched frame references.");
   }
 
-  const generatedImageCount = Number(context.generatedImageCount || 0);
-  if (generatedImageCount > 0) {
+  if (completeGeneratedImageSet) {
+    add("existing_images", "ok", "Generated images are ready", `${generatedImageCount} generated image(s) will be reused.`);
+  } else if (generatedImageCount > 0) {
     add("existing_images", "warning", "Generated images already exist", `${generatedImageCount} generated image(s) already exist. Use regenerate if you want to overwrite.`);
   }
 
@@ -614,8 +695,12 @@ export function buildPreflightReport(task, context = {}) {
   }
 }
 
-export function pipelineStartBlockers(preflight = {}) {
-  return (preflight.blockers || []).filter((item) => item.id !== "source_lookup_needed");
+export function pipelineStartBlockers(preflight = {}, task = null) {
+  return (preflight.blockers || []).filter((item) => {
+    if (item.id === "source_lookup_needed") return false;
+    if (item.id === "source_review" && shouldAutoConfirmSource(task)) return false;
+    return true;
+  });
 }
 
 export function buildTaskProgress(task = {}, context = {}) {
@@ -631,18 +716,30 @@ export function buildTaskProgress(task = {}, context = {}) {
   if (isFailureStatus(status)) {
     return progress("failed", "error", "\u6d41\u7a0b\u9700\u5904\u7406", blockerMessage || "\u540e\u53f0\u6d41\u7a0b\u5931\u8d25\u6216\u88ab\u9884\u68c0\u62e6\u622a\uff0c\u8bf7\u67e5\u770b\u65e5\u5fd7\u4e2d\u7684\u5931\u8d25\u539f\u56e0\u3002", "\u4fee\u590d\u95ee\u9898\u540e\u518d\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
   }
-  if (sourceState.required && !sourceState.ready) {
+  if (sourceState.required && !sourceState.ready && !shouldAutoConfirmSource(task)) {
     return progress("source_review", "action", "\u7b49\u5f85\u786e\u8ba4 1\u5e97\u5546\u54c1", "\u5df2\u627e\u5230 1\u5e97\u6765\u6e90\uff0c\u9700\u8981\u5148\u786e\u8ba4\u662f\u5426\u662f\u6b63\u786e\u5546\u54c1\u3002", "\u786e\u8ba4 1\u5e97\u5546\u54c1\u540e\uff0c\u518d\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+  }
+  if (status === "bigseller_copy_done") {
+    return progress("bigseller_discover", "ready", "\u590d\u5236\u8349\u7a3f\u5df2\u5b8c\u6210", "1 \u5e97\u5546\u54c1\u5df2\u590d\u5236\u5230\u76ee\u6807\u5e97\u8349\u7a3f\uff0c\u4e0b\u4e00\u6b65\u662f\u67e5\u627e 4-9 \u5e97\u8349\u7a3f\u94fe\u63a5\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\uff0c\u7cfb\u7edf\u4f1a\u7ee7\u7eed\u5339\u914d\u8349\u7a3f\u5e76\u4fdd\u5b58\u56fe\u7247\u3002");
+  }
+  if (status === "image2_done") {
+    return progress("bigseller_discover", "ready", "\u56fe\u7247\u5df2\u751f\u6210", "\u5404\u5e97\u56fe\u7247\u5df2\u751f\u6210\uff0c\u4e0b\u4e00\u6b65\u662f\u67e5\u627e 4-9 \u5e97 BigSeller \u8349\u7a3f\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\uff0c\u7cfb\u7edf\u4f1a\u5339\u914d\u8349\u7a3f\u5e76\u4fdd\u5b58\u56fe\u7247\u3002");
+  }
+  if (status === "bigseller_discover_done") {
+    return progress("bigseller_save", "ready", "\u8349\u7a3f\u5df2\u627e\u5230", "\u5df2\u5339\u914d 4-9 \u5e97\u8349\u7a3f\u94fe\u63a5\uff0c\u4e0b\u4e00\u6b65\u662f\u4e0a\u4f20\u56fe\u7247\u5e76\u4fdd\u5b58\u8349\u7a3f\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\uff0c\u7cfb\u7edf\u4f1a\u4e0a\u4f20\u56fe\u7247\u5e76\u4fdd\u5b58\u8349\u7a3f\u3002");
+  }
+  if (status === "bigseller_save_done") {
+    return progress("done", "done", "\u5df2\u5b8c\u6210", "\u56fe\u7247\u5df2\u4e0a\u4f20\u5e76\u4fdd\u5b58\u5230 BigSeller \u8349\u7a3f\u3002", "\u5230\u7ed3\u679c\u5e93\u68c0\u67e5\u56fe\u7247\uff0c\u4e0d\u6ee1\u610f\u7684\u5e97\u94fa\u53ef\u4ee5\u91cd\u751f\u3002");
   }
   if (["fetching_source_images", "source_config_ready", "pipeline_queued"].includes(status)
     || blockers.some((item) => item.id === "source_lookup_needed")) {
-    return progress("source_lookup", "running", "\u6b63\u5728/\u7b49\u5f85\u68c0\u7d22 1\u5e97\u5546\u54c1", "\u7cfb\u7edf\u4f1a\u5148\u6839\u636e\u5546\u54c1\u7f16\u7801/SKU \u5339\u914d 1\u5e97\u5546\u54c1\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\uff0c\u68c0\u7d22\u5230\u540e\u9700\u8981\u786e\u8ba4\u5546\u54c1\u3002");
+    return progress("source_lookup", "running", "\u6b63\u5728/\u7b49\u5f85\u68c0\u7d22 1\u5e97\u5546\u54c1", "\u7cfb\u7edf\u4f1a\u5148\u6839\u636e Item ID/SKU \u5339\u914d 1\u5e97\u5546\u54c1\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\uff0c\u68c0\u7d22\u5230\u540e\u9700\u8981\u786e\u8ba4\u5546\u54c1\u3002");
+  }
+  if (["pipeline_copying_source_to_bigseller_drafts", "copying_source_to_bigseller_drafts", "bigseller_copy_config_ready"].includes(status)) {
+    return progress("bigseller_copy", "running", "\u6b63\u5728\u590d\u5236 1\u5e97\u5230\u76ee\u6807\u5e97\u8349\u7a3f", "\u7cfb\u7edf\u6b63\u5728 BigSeller \u6309 SKU \u627e\u5230 1\u5e97\u5728\u7ebf\u5546\u54c1\uff0c\u5e76\u53ea\u590d\u5236\u5230\u7f3a\u5931\u8349\u7a3f\u7684 4-9 \u5e97\u3002", "\u7b49\u5f85 BigSeller \u590d\u5236\u5b8c\u6210\uff0c\u7136\u540e\u518d\u67e5\u627e\u8349\u7a3f\u5e76\u4e0a\u4f20\u56fe\u7247\u3002");
   }
   if (["pipeline_generating_images", "generating_images", "regenerating_images", "image2_config_ready"].includes(status)) {
-    return progress("image_generation", "running", "\u6b63\u5728\u751f\u6210\u5404\u5e97\u56fe\u7247", "\u7cfb\u7edf\u6b63\u5728\u6309 4-9 \u5e97\u8fb9\u6846\u548c\u5e97\u94fa\u98ce\u683c\u751f\u6210\u56fe\u3002", "\u7b49\u5f85\u751f\u6210\u5b8c\u6210\uff0c\u7136\u540e\u5230\u7ed3\u679c\u5e93\u6309\u5e97\u94fa\u67e5\u770b\u3002");
-  }
-  if (["copying_source_to_bigseller_drafts", "bigseller_copy_config_ready"].includes(status)) {
-    return progress("bigseller_copy", "running", "\u6b63\u5728\u590d\u5236 1\u5e97\u5230\u76ee\u6807\u5e97\u8349\u7a3f", "\u7cfb\u7edf\u6b63\u5728 BigSeller \u6309 SKU \u627e\u5230 1\u5e97\u5728\u7ebf\u5546\u54c1\uff0c\u5e76\u53ea\u590d\u5236\u5230\u7f3a\u5931\u8349\u7a3f\u7684 4-9 \u5e97\u3002", "\u7b49\u5f85 BigSeller \u590d\u5236\u5b8c\u6210\uff0c\u7136\u540e\u518d\u67e5\u627e\u8349\u7a3f\u5e76\u4e0a\u4f20\u56fe\u7247\u3002");
+    return progress("image_generation", "running", "\u6b63\u5728\u751f\u6210\u5404\u5e97\u56fe\u7247", "\u7cfb\u7edf\u6b63\u5728\u6309 4-9 \u5e97\u8fb9\u6846\u548c\u5e97\u94fa\u98ce\u683c\u751f\u6210\u56fe\u3002", "\u7b49\u5f85\u751f\u6210\u5b8c\u6210\uff0c\u7136\u540e\u5339\u914d\u8349\u7a3f\u5e76\u4fdd\u5b58\u56fe\u7247\u3002");
   }
   if (["pipeline_discovering_bigseller_drafts", "discovering_bigseller_drafts", "bigseller_config_ready"].includes(status)) {
     return progress("bigseller_discover", "running", "\u6b63\u5728\u67e5\u627e BigSeller \u8349\u7a3f", "\u56fe\u7247\u6b65\u9aa4\u5df2\u5b8c\u6210\uff0c\u6b63\u5728\u5339\u914d\u5404\u5e97 BigSeller \u8349\u7a3f\u3002", "\u7b49\u5f85\u8349\u7a3f\u5339\u914d\u5b8c\u6210\u3002");
@@ -656,11 +753,101 @@ export function buildTaskProgress(task = {}, context = {}) {
   if (preflight.status === "blocked") {
     return progress("blocked", "error", "\u6682\u65f6\u4e0d\u80fd\u751f\u6210", blockerMessage || "\u751f\u6210\u524d\u68c0\u67e5\u6709\u963b\u65ad\u9879\u3002", "\u5148\u5904\u7406\u4e0b\u65b9\u68c0\u67e5\u9879\uff0c\u518d\u7ee7\u7eed\u3002");
   }
-  return progress("created", "idle", "\u4efb\u52a1\u5df2\u521b\u5efa", "\u7cfb\u7edf\u5df2\u8bb0\u5f55\u5546\u54c1\u7f16\u7801/SKU \u548c\u76ee\u6807\u5e97\u94fa\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+  return progress("created", "idle", "\u4efb\u52a1\u5df2\u521b\u5efa", "\u7cfb\u7edf\u5df2\u8bb0\u5f55 Item ID/SKU \u548c\u76ee\u6807\u5e97\u94fa\u3002", "\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
 
   function progress(stage, level, label, message, nextAction) {
-    return { stage, level, label, message, nextAction };
+    return { stage, level, label, message, nextAction, timing: task?.pipelineTiming || null };
   }
+}
+
+export function pipelineStageForStatus(status) {
+  const value = String(status || "");
+  if (value === "pipeline_done") return "done";
+  if (value === "bigseller_save_done") return "done";
+  if (isFailureStatus(value)) return "failed";
+  if (["fetching_source_images", "source_config_ready", "pipeline_queued"].includes(value)) return "source_lookup";
+  if (value === "source_review_required") return "source_review";
+  if (["pipeline_copying_source_to_bigseller_drafts", "copying_source_to_bigseller_drafts", "bigseller_copy_config_ready"].includes(value)) return "bigseller_copy";
+  if (["pipeline_generating_images", "generating_images", "regenerating_images", "image2_config_ready"].includes(value)) return "image_generation";
+  if (["pipeline_discovering_bigseller_drafts", "discovering_bigseller_drafts", "bigseller_config_ready", "bigseller_copy_done", "image2_done"].includes(value)) return "bigseller_discover";
+  if (["pipeline_saving_bigseller_drafts", "saving_bigseller_drafts", "bigseller_discover_done"].includes(value)) return "bigseller_save";
+  if (value === "preflight_blocked") return "blocked";
+  return null;
+}
+
+export function pipelineStageCompleted(task = {}, stage, context = {}) {
+  const status = String(task?.status || "");
+  if (status === "pipeline_done") return true;
+  const stages = task?.pipelineTiming?.stages || {};
+  if (stage === "bigseller_copy") {
+    return [
+      "bigseller_copy_done",
+      "bigseller_discover_done",
+      "bigseller_save_done"
+    ].includes(status) || Boolean(stages.bigseller_copy?.finishedAt) || Boolean(context.hasDiscoveredConfig);
+  }
+  if (stage === "image_generation") {
+    return [
+      "image2_done",
+      "bigseller_discover_done",
+      "bigseller_save_done"
+    ].includes(status) || Number(context.imageCount || 0) >= expectedGeneratedImageCount(task);
+  }
+  if (stage === "bigseller_discover") {
+    return [
+      "bigseller_discover_done",
+      "bigseller_save_done"
+    ].includes(status) || Boolean(context.hasDiscoveredConfig);
+  }
+  if (stage === "bigseller_save") {
+    return status === "bigseller_save_done";
+  }
+  return false;
+}
+
+export function expectedGeneratedImageCount(task = {}) {
+  return resolveTargetStoreIds(task?.targetStores || []).length * 4;
+}
+
+export function recordPipelineTiming(currentTiming, status, nowIso = new Date().toISOString()) {
+  const stage = pipelineStageForStatus(status);
+  if (!stage) return currentTiming || null;
+  if (String(status || "") === "pipeline_queued") {
+    return {
+      startedAt: nowIso,
+      finishedAt: "",
+      activeStage: stage,
+      stages: {
+        [stage]: { startedAt: nowIso }
+      }
+    };
+  }
+
+  const timing = {
+    startedAt: currentTiming?.startedAt || nowIso,
+    finishedAt: currentTiming?.finishedAt || "",
+    activeStage: currentTiming?.activeStage || "",
+    stages: { ...(currentTiming?.stages || {}) }
+  };
+
+  const previousStage = timing.activeStage;
+  if (previousStage && previousStage !== stage && timing.stages[previousStage] && !timing.stages[previousStage].finishedAt) {
+    timing.stages[previousStage] = { ...timing.stages[previousStage], finishedAt: nowIso };
+  }
+
+  timing.stages[stage] = {
+    ...(timing.stages[stage] || {}),
+    startedAt: timing.stages[stage]?.startedAt || nowIso
+  };
+  timing.activeStage = stage;
+
+  if (["done", "failed", "blocked"].includes(stage)) {
+    timing.finishedAt = nowIso;
+  } else {
+    timing.finishedAt = "";
+  }
+
+  return timing;
 }
 
 function isFailureStatus(status) {
@@ -737,6 +924,39 @@ function intersectSkus(left, right) {
   return right.filter((sku) => wanted.has(sku));
 }
 
+function sourceStoreEvidencePresent(task = {}) {
+  const text = [
+    task?.sourceRowText,
+    task?.sourceTitle,
+    task?.sourceDetail
+  ].filter(Boolean).join(" ");
+  const normalized = String(text || "")
+    .replace(/\s+/g, "")
+    .replace(/[()\uFF08\uFF09]/g, "")
+    .toLowerCase();
+  return normalized.includes("1\u5e97")
+    || normalized.includes("store1")
+    || normalized.includes("1store");
+}
+
+export function extractSourceDraftSkuGroup(manifest = {}) {
+  return extractSkuTokens([
+    manifest.sourceRowText,
+    manifest.skuText,
+    manifest.skusText
+  ].filter(Boolean).join(" "));
+}
+
+export function effectiveBigSellerSkuGroup(task = {}) {
+  const sourceSkus = task?.sourceConfirmedAt ? parseSkuGroup(task?.sourceDraftSkuGroup) : [];
+  return sourceSkus.length ? sourceSkus : parseSkuGroup(task?.skuGroup);
+}
+
+export function effectiveBigSellerItemIds(task = {}) {
+  const sourceItemIds = task?.sourceConfirmedAt ? extractBigSellerItemIdsFromText(task?.sourceRowText) : [];
+  return sourceItemIds.length ? sourceItemIds : parseBigSellerItemIds(task?.skuGroup);
+}
+
 export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targetStores }) {
   return {
     storeMap: buildBigSellerStoreMap(targetStores),
@@ -750,13 +970,14 @@ export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targ
   };
 }
 
-export function buildBigSellerCopyConfig({ productName, skuGroup, targetStores, sourceStoreMatch = "1\u5e97" }) {
+export function buildBigSellerCopyConfig({ productName, skuGroup, itemIds = [], targetStores, sourceStoreMatch = "1\u5e97" }) {
   return {
     storeMap: buildBigSellerStoreMap(targetStores),
     copyJobs: [
       {
         name: productName,
         skus: parseSkuGroup(skuGroup),
+        itemIds: parseBigSellerItemIds(itemIds),
         sourceStoreMatch
       }
     ]
@@ -782,13 +1003,60 @@ export function sourceImagesMissingMessage(task) {
   return `Could not load source images for SKU group [${skuText}]. BigSeller did not create source-images.json. Make sure the 1-store active listing contains one of these SKUs, or paste/upload source images and retry.`;
 }
 
-export function describeImage2Runtime(env = process.env) {
-  const baseUrl = env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+export function normalizeImageApiConfig(input = {}) {
+  const rawBaseUrl = String(input?.baseUrl || "https://api.openai.com/v1").trim();
+  let parsed;
+  try {
+    parsed = new URL(rawBaseUrl);
+  } catch {
+    throw new Error(`Invalid API URL: ${rawBaseUrl}`);
+  }
+  parsed.hash = "";
+  parsed.search = "";
+  const baseUrl = parsed.toString().replace(/\/+$/u, "");
+  const apiKey = String(input?.apiKey || "").trim();
+  return apiKey ? { baseUrl, apiKey } : { baseUrl };
+}
+
+export function publicImageApiConfig(config = {}) {
+  const normalized = normalizeImageApiConfig(config);
+  return {
+    baseUrl: normalized.baseUrl,
+    apiKeySet: Boolean(normalized.apiKey),
+    maskedApiKey: maskSecret(normalized.apiKey)
+  };
+}
+
+export function effectiveImageApiEnv(env = process.env, config = {}) {
+  const normalized = normalizeImageApiConfig({
+    baseUrl: config?.baseUrl || env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+    apiKey: config?.apiKey || env.OPENAI_API_KEY || ""
+  });
+  return {
+    ...env,
+    OPENAI_API_KEY: normalized.apiKey || "",
+    OPENAI_BASE_URL: normalized.baseUrl
+  };
+}
+
+export function describeImage2Runtime(env = process.env, config = {}) {
+  let effectiveEnv;
+  try {
+    effectiveEnv = effectiveImageApiEnv(env, config);
+  } catch {
+    effectiveEnv = {
+      ...env,
+      OPENAI_API_KEY: config?.apiKey || env.OPENAI_API_KEY || "",
+      OPENAI_BASE_URL: config?.baseUrl || env.OPENAI_BASE_URL || "https://api.openai.com/v1"
+    };
+  }
+  const baseUrl = effectiveEnv.OPENAI_BASE_URL || "https://api.openai.com/v1";
   const runtime = {
-    apiKeySet: Boolean(env.OPENAI_API_KEY),
+    apiKeySet: Boolean(effectiveEnv.OPENAI_API_KEY),
     baseUrl,
     localProxy: null
   };
+  if (config?.apiKey || config?.baseUrl) runtime.configSource = "local";
 
   try {
     const parsed = new URL(baseUrl);
@@ -805,13 +1073,20 @@ export function describeImage2Runtime(env = process.env) {
   return runtime;
 }
 
+function maskSecret(secret) {
+  const value = String(secret || "");
+  if (!value) return "";
+  if (value.length <= 8) return "****";
+  return `${value.slice(0, 3)}****${value.slice(-4)}`;
+}
+
 const FALLBACK_PRODUCT_NAME = "DailyCare Beauty Essential";
 const VIETNAMESE_DIACRITIC_RE = /[\u00C0-\u1EF9]/;
 const CHINESE_RE = /[\u3400-\u9FFF]/;
 const MOJIBAKE_RE = /\?{2,}|\uFFFD/;
 const BUYER_COPY_STANDARD = Object.freeze({
-  titleMin: 80,
-  titleMax: 100,
+  titleMin: 90,
+  titleMax: 99,
   detailSections: [
     vietnameseText("C\\u00f4ng d\\u1ee5ng ch\\u00ednh"),
     vietnameseText("\\u0110\\u1ed1i t\\u01b0\\u1ee3ng ph\\u00f9 h\\u1ee3p"),
@@ -844,7 +1119,7 @@ function buildListingCopyPlan({ cleanName, profile, storeId, benefitLines }) {
     cleanName,
     profile,
     storeId: normalizedStoreId,
-    titleIdentity: compactTitleIdentity(cleanName),
+    titleIdentity: styleTitleIdentity(compactTitleIdentity(cleanName)),
     titlePhraseSets: rules.titlePhraseSets,
     sections: rules.sections
   };
@@ -854,12 +1129,15 @@ function buildBuyerCopyRules({ profile, storeId, benefitLines }) {
   // This is the single assembly point for buyer-facing listing copy.
   // Keep title/detail structure changes here so the pipeline does not grow scattered rules.
   const [benefitsHeading, audienceHeading, sensationHeading, usageHeading, storageHeading] = BUYER_COPY_STANDARD.detailSections;
+  const formalSkincareSections = profile.type === "skincare" && !benefitLines
+    ? formalSkincareSectionsForStore(storeId)
+    : null;
   const sectionLines = {
-    [benefitsHeading]: benefitLines || benefitsForStore(profile, storeId),
-    [audienceHeading]: audienceForStore(profile, storeId),
-    [sensationHeading]: sensationForStore(profile, storeId),
-    [usageHeading]: usageForStore(profile, storeId),
-    [storageHeading]: storageForStore(storeId)
+    [benefitsHeading]: formalSkincareSections?.benefits || benefitLines || benefitsForStore(profile, storeId),
+    [audienceHeading]: formalSkincareSections?.audience || audienceForStore(profile, storeId),
+    [sensationHeading]: formalSkincareSections?.sensation || sensationForStore(profile, storeId),
+    [usageHeading]: formalSkincareSections?.usage || usageForStore(profile, storeId),
+    [storageHeading]: formalSkincareSections?.storage || storageForStore(storeId)
   };
   return {
     titlePhraseSets: titlePhraseSetsForStore(storeId, profile),
@@ -868,6 +1146,148 @@ function buildBuyerCopyRules({ profile, storeId, benefitLines }) {
       lines: sectionLines[heading]
     }))
   };
+}
+
+function formalSkincareSectionsForStore(storeId) {
+  const commonStorage = [
+    "- Bảo quản nơi khô thoáng, tránh ánh nắng trực tiếp và nhiệt độ cao.",
+    "- Đóng kín nắp sau khi dùng để giữ kết cấu sản phẩm ổn định."
+  ];
+  const sections = {
+    4: {
+      benefits: [
+        "- Bổ sung độ ẩm dịu nhẹ, giúp bề mặt da mềm mại hơn trong routine mỗi ngày.",
+        "- Hỗ trợ HA/B5 tạo cảm giác da căng mịn, phù hợp khách ưu tiên chăm sóc ổn định.",
+        "- Kết cấu gel serum dễ thoa, dễ kết hợp với kem dưỡng mà không gây nặng mặt.",
+        "- Mang lại cảm giác chăm sóc đáng tin cậy, gọn gàng và phù hợp sử dụng lâu dài."
+      ],
+      audience: [
+        "- Phù hợp da thiếu ẩm, da khô nhẹ hoặc người muốn duy trì độ ẩm hằng ngày.",
+        "- Phù hợp khách thích routine đơn giản, ưu tiên cảm giác mềm và dễ chịu sau khi thoa."
+      ],
+      sensation: [
+        "- Serum mỏng nhẹ, tán đều trên da và để lại cảm giác ẩm mượt tự nhiên.",
+        "- Sau khi thoa, da có cảm giác mềm hơn, bớt khô căng và dễ tiếp tục bước dưỡng sau."
+      ],
+      usage: [
+        "- Dùng sau toner, lấy 2-3 giọt serum và thoa đều lên mặt.",
+        "- Vỗ nhẹ để sản phẩm thấm vào da, sau đó khóa ẩm bằng kem dưỡng.",
+        "- Có thể dùng sáng hoặc tối tùy nhu cầu cấp ẩm của da."
+      ],
+      storage: commonStorage
+    },
+    5: {
+      benefits: [
+        "- Cấp ẩm tươi mát cho da thiếu nước, giúp da có cảm giác nhẹ và dễ chịu hơn.",
+        "- Chất serum mỏng, phù hợp dùng ban ngày trước kem dưỡng hoặc lớp makeup nhẹ.",
+        "- Hỗ trợ làm dịu cảm giác khô căng, giúp bề mặt da trông mềm và có sức sống.",
+        "- Phù hợp routine nhanh, dễ dùng trong thời tiết nóng ẩm hoặc khi cần làm mới da."
+      ],
+      audience: [
+        "- Phù hợp da thiếu nước, da xỉn màu nhẹ hoặc cần cảm giác tươi mát nhanh.",
+        "- Phù hợp người thích sản phẩm mỏng nhẹ, không muốn cảm giác bí hay dày trên da."
+      ],
+      sensation: [
+        "- Khi thoa có cảm giác mát nhẹ, serum thấm gọn và không để lại lớp nặng.",
+        "- Da có cảm giác được tiếp nước nhanh, mềm hơn và dễ chịu hơn trong ngày."
+      ],
+      usage: [
+        "- Dùng trên da khô ráo sau bước toner, thoa một lớp mỏng trên toàn mặt.",
+        "- Tập trung vùng da dễ khô như hai má, quanh miệng hoặc vùng cần cấp ẩm thêm.",
+        "- Ban ngày nên tiếp tục kem dưỡng và kem chống nắng để hoàn thiện routine."
+      ],
+      storage: commonStorage
+    },
+    6: {
+      benefits: [
+        "- Mang lại cảm giác dưỡng ẩm cao cấp, giúp da trông đầy đặn và mịn màng hơn.",
+        "- Hỗ trợ B5/HA làm dịu cảm giác khô căng, phù hợp routine chăm sóc kỹ.",
+        "- Kết cấu gel serum mềm mượt, dễ thoa đều và tạo trải nghiệm chăm sóc tinh tế.",
+        "- Phù hợp khách ưu tiên sản phẩm dưỡng da có hình ảnh thanh lịch và chỉn chu."
+      ],
+      audience: [
+        "- Phù hợp da cần phục hồi độ ẩm, da dễ khô hoặc thiếu sự mềm mại.",
+        "- Phù hợp người muốn routine dưỡng da gọn nhưng vẫn có cảm giác cao cấp."
+      ],
+      sensation: [
+        "- Chất gel serum êm, trượt nhẹ trên da và tạo cảm giác được nâng niu.",
+        "- Sau khi dùng, da có cảm giác ẩm sâu hơn, mịn hơn và bớt căng rát."
+      ],
+      usage: [
+        "- Lấy lượng vừa đủ, áp nhẹ serum lên da theo từng vùng.",
+        "- Massage nhẹ để sản phẩm lan đều, tránh kéo miết quá mạnh trên da.",
+        "- Dùng đều buổi tối hoặc khi da cần dưỡng ẩm kỹ hơn."
+      ],
+      storage: commonStorage
+    },
+    7: {
+      benefits: [
+        "- Cấp ẩm nhẹ nhàng, giúp bề mặt da mềm mịn và giảm cảm giác khô căng.",
+        "- Hỗ trợ làm dịu da, tạo cảm giác tươi mới sau mỗi lần sử dụng.",
+        "- Kết cấu dễ tán, phù hợp đưa vào routine chăm sóc da hằng ngày.",
+        "- Giúp da trông rạng rỡ hơn, phù hợp phong cách làm đẹp tự nhiên."
+      ],
+      audience: [
+        "- Phù hợp người cần cấp ẩm đều đặn, muốn bề mặt da mềm hơn mỗi ngày.",
+        "- Phù hợp da khô nhẹ, thiếu sức sống hoặc cần cảm giác tươi mới hơn."
+      ],
+      sensation: [
+        "- Kết cấu ẩm nhẹ, dễ thoa đều trên bề mặt da mà không quá dày.",
+        "- Dùng đều giúp da có cảm giác mềm mịn, tươi hơn và dễ chịu hơn."
+      ],
+      usage: [
+        "- Nhỏ 2-3 giọt ra lòng bàn tay, thoa đều lên mặt và cổ.",
+        "- Vỗ nhẹ đến khi serum thấm đều, sau đó dùng kem dưỡng nếu cần.",
+        "- Duy trì đều đặn để da có cảm giác mềm mịn hơn."
+      ],
+      storage: commonStorage
+    },
+    8: {
+      benefits: [
+        "- Bổ sung HA/B5 cho routine dưỡng ẩm, giúp da có cảm giác cân bằng hơn.",
+        "- Kết cấu dễ hấp thu, phù hợp dùng trước các bước dưỡng tiếp theo.",
+        "- Hỗ trợ làm dịu cảm giác khô căng, cho bề mặt da trông mịn hơn.",
+        "- Trình bày công dụng rõ ràng, phù hợp khách muốn chọn serum theo nhu cầu cụ thể."
+      ],
+      audience: [
+        "- Phù hợp người muốn serum rõ công dụng, dễ theo dõi cảm giác ẩm và mịn da.",
+        "- Phù hợp da cần bổ sung HA/B5 trong routine gọn nhẹ sáng hoặc tối."
+      ],
+      sensation: [
+        "- Serum thấm gọn, cho cảm giác rõ về độ ẩm nhưng vẫn thoáng nhẹ.",
+        "- Bề mặt da có cảm giác cân bằng hơn, mịn hơn và dễ tiếp tục các bước sau."
+      ],
+      usage: [
+        "- Dùng sau toner, thoa từng lớp mỏng để kiểm soát cảm giác trên da.",
+        "- Ưu tiên vùng da thiếu ẩm, sau đó tiếp tục kem dưỡng để khóa ẩm.",
+        "- Có thể dùng trong routine sáng hoặc tối khi cần bổ sung HA/B5."
+      ],
+      storage: commonStorage
+    },
+    9: {
+      benefits: [
+        "- Cấp ẩm nhanh cho da thiếu nước, giúp da có cảm giác mềm mịn rõ hơn.",
+        "- Hỗ trợ làm dịu và cải thiện bề mặt da trong routine chăm sóc mỗi ngày.",
+        "- Dùng đều giúp làn da nhìn tươi hơn, mềm hơn và dễ trang điểm hơn.",
+        "- Phù hợp người cần sản phẩm dưỡng da đơn giản, dễ dùng và dễ duy trì."
+      ],
+      audience: [
+        "- Phù hợp người cần serum dưỡng ẩm tiện lợi để dùng đều đặn tại nhà.",
+        "- Phù hợp da cần cảm giác mềm mượt nhanh và dễ phối với các bước chăm sóc khác."
+      ],
+      sensation: [
+        "- Chất gel nhẹ, dễ dùng mỗi ngày và không gây cảm giác nặng mặt.",
+        "- Sau khi thoa, da có cảm giác ẩm mịn nhanh và sẵn sàng cho bước tiếp theo."
+      ],
+      usage: [
+        "- Thoa một lượng vừa đủ lên da sau toner hoặc tinh chất lỏng.",
+        "- Dùng đầu ngón tay vỗ nhẹ, tránh kéo miết quá mạnh trên da.",
+        "- Kết hợp kem dưỡng phù hợp để duy trì cảm giác ẩm mịn."
+      ],
+      storage: commonStorage
+    }
+  };
+  return sections[storeId] || sections[7];
 }
 
 function renderListingDetail(plan) {
@@ -911,6 +1331,66 @@ function audienceForStore(profile, storeId) {
       ]
     };
     return cleanserAudience[storeId] || cleanserAudience[7];
+  }
+
+  if (profile.type === "makeup") {
+    const makeupAudience = {
+      4: [
+        "- Phu hop nguoi thich lop trang diem tu nhien, gon dep va de dung hang ngay.",
+        "- Phu hop khach can san pham de tao nen nhanh khi di lam hoac di choi."
+      ],
+      5: [
+        "- Phu hop nguoi muon lop nen tuoi sang, mong nhe va khong qua day.",
+        "- Phu hop khach can san pham de tan, de dieu chinh do che phu."
+      ],
+      6: [
+        "- Phu hop nguoi uu tien lop makeup cao cap, min mat va co hieu ung thanh lich.",
+        "- Phu hop khach can san pham nen dep cho hinh anh chi chu hon."
+      ],
+      7: [
+        "- Phu hop nguoi can lop nen de dung, de tan va phu hop trang diem moi ngay.",
+        "- Phu hop khach muon che phu vua phai nhung van giu cam giac tu nhien."
+      ],
+      8: [
+        "- Phu hop nguoi muon lop nen gon dep, mau da deu hon va de dam lai.",
+        "- Phu hop khach can kem nen de mang theo, de dung khi di lam hoac ra ngoai."
+      ],
+      9: [
+        "- Phu hop nguoi thich lop nen nhe mat, thanh lich va de phoi voi nhieu kieu makeup.",
+        "- Phu hop khach can san pham trang diem tien loi cho ngay ban ron."
+      ]
+    };
+    return makeupAudience[storeId] || makeupAudience[7];
+  }
+
+  if (profile.type === "skincare") {
+    const skincareAudience = {
+      4: [
+        "- Phu hop da can bo sung do am nhe nha trong routine cham soc moi ngay.",
+        "- Phu hop nguoi uu tien cam giac mem, em va de ket hop voi kem duong."
+      ],
+      5: [
+        "- Phu hop da thieu nuoc, xin mau nhe hoac can cam giac tuoi mat nhanh.",
+        "- Phu hop nguoi thich serum mong nhe, de thoa truoc kem duong hoac makeup."
+      ],
+      6: [
+        "- Phu hop nguoi uu tien cham soc da cao cap, da can phuc hoi va duong am ky.",
+        "- Phu hop da can routine tinh gon nhung van co cam giac duong da chi chu."
+      ],
+      7: [
+        "- Phu hop nguoi can cap am deu dan, giup be mat da mem min hon moi ngay.",
+        "- Phu hop da kho nhe, thieu suc song hoac can cam giac tuoi moi hon."
+      ],
+      8: [
+        "- Phu hop nguoi muon serum ro cong dung, de theo doi cam giac am va min da.",
+        "- Phu hop da can bo sung HA/B5 trong routine gon nhe sang hoac toi."
+      ],
+      9: [
+        "- Phu hop nguoi can san pham duong am tien loi, de duy tri deu dan tai nha.",
+        "- Phu hop da can cam giac mem muot nhanh va de phoi voi cac buoc cham soc khac."
+      ]
+    };
+    return skincareAudience[storeId] || skincareAudience[7];
   }
 
   const audience = {
@@ -979,6 +1459,65 @@ function sensationForStore(profile, storeId) {
       "- Sau khi rua, da co cam giac sach, mem min va thong thoang hon."
     ];
   }
+  if (profile.type === "makeup") {
+    const makeupSensation = {
+      4: [
+        "- Chat kem tan mem, tao cam giac mong nhe va de can chinh do che phu.",
+        "- Sau khi tan, lop nen trong gon gang, da deu mau hon va khong qua day."
+      ],
+      5: [
+        "- Ket cau long nhe, de trai deu va cho hieu ung nen tuoi sang.",
+        "- Cam giac tren da nhe, phu hop lop trang diem ban ngay."
+      ],
+      6: [
+        "- Lop finish min va thanh lich, phu hop khi can dien mao chi chu.",
+        "- Chat kem de tan, giup be mat da trong mem va deu hon."
+      ],
+      7: [
+        "- Ket cau de tan bang mut hoac co, khong tao cam giac bi day nen.",
+        "- Sau khi dung, guong mat trong tu nhien va co do che phu vua phai."
+      ],
+      8: [
+        "- Lop nen bam da nhe, de dieu chinh them o vung can che phu.",
+        "- Sau khi tan, be mat da trong min hon, mau da deu va gon dep."
+      ],
+      9: [
+        "- Cam giac nhe mat, de dung cho makeup nhanh trong ngay.",
+        "- Lop finish tu nhien, de phoi voi phan phu hoac son moi."
+      ]
+    };
+    return makeupSensation[storeId] || makeupSensation[7];
+  }
+
+  if (profile.type === "skincare") {
+    const skincareSensation = {
+      4: [
+        "- Ket cau serum mong nhe, tan deu va de tao cam giac am em tren da.",
+        "- Sau khi thoa, be mat da co cam giac mem hon va bot kho cang."
+      ],
+      5: [
+        "- Cam giac tuoi mat, tham nhanh va khong de lai lop nang tren da.",
+        "- Da co cam giac duoc cap nuoc nhe, phu hop khi can lam moi nhanh."
+      ],
+      6: [
+        "- Chat gel serum muot, cho cam giac cham soc cao cap va de tan.",
+        "- Sau khi dung, da co cam giac day am hon, min hon va duoc nang niu."
+      ],
+      7: [
+        "- Ket cau am nhe, de thoa deu tren be mat da ma khong qua day.",
+        "- Dung deu giup da co cam giac mem min, tuoi hon va de chiu."
+      ],
+      8: [
+        "- Serum tham gon, cho cam giac ro ve do am nhung van thoang nhe.",
+        "- Be mat da co cam giac can bang hon, min hon va de tiep tuc cac buoc sau."
+      ],
+      9: [
+        "- Chat gel nhe, de dung moi ngay va khong gay cam giac bi nang mat.",
+        "- Sau khi thoa, da co cam giac am min nhanh va de trang diem hon."
+      ]
+    };
+    return skincareSensation[storeId] || skincareSensation[7];
+  }
   return storeDetailFor(storeId);
 }
 
@@ -1023,6 +1562,78 @@ function usageForStore(profile, storeId) {
       ]
     };
     return cleanserUsage[storeId] || cleanserUsage[7];
+  }
+
+  if (profile.type === "makeup") {
+    const makeupUsage = {
+      4: [
+        "- Lay mot luong nho, cham len tran, hai ma, mui va cam.",
+        "- Dung mut hoac co tan deu tu giua mat ra ngoai.",
+        "- Tang them mot lop mong o vung can che phu cao hon."
+      ],
+      5: [
+        "- Lac nhe neu can, lay luong vua du len mu ban tay.",
+        "- Tan thanh lop mong truoc, sau do dieu chinh them theo nhu cau.",
+        "- Co the phoi cung phan phu de lop nen trong gon hon."
+      ],
+      6: [
+        "- Chuan bi da voi kem lot neu can, sau do tan san pham thanh lop mong.",
+        "- Thao tac cham o vung can che phu de lop nen deu va min hon.",
+        "- Hoan thien voi phan phu hoac xit khoa nen tuy phong cach."
+      ],
+      7: [
+        "- Cham san pham len cac diem chinh tren mat.",
+        "- Tan deu bang mut am hoac co nen theo chieu tu trong ra ngoai.",
+        "- Dam them tung lop mong de giu hieu ung tu nhien."
+      ],
+      8: [
+        "- Dung sau kem lot neu co, lay luong vua du cho mot lop nen mong.",
+        "- Tan deu tren da, tap trung them o vung can che phu nhu hai ben mui hoac cam.",
+        "- Mang theo khi ra ngoai neu can dam lai nhe trong ngay."
+      ],
+      9: [
+        "- Dung tren da da duoc chuan bi, bat dau voi luong nho.",
+        "- Tan deu de lop nen mong va khong bi day o ria mat.",
+        "- Ket hop phan phu hoac che khuyet diem neu can hoan thien hon."
+      ]
+    };
+    return makeupUsage[storeId] || makeupUsage[7];
+  }
+
+  if (profile.type === "skincare") {
+    const skincareUsage = {
+      4: [
+        "- Sau toner, lay 2-3 giot serum va thoa deu len mat.",
+        "- Vo nhe de san pham tan vao da, sau do khoa am bang kem duong.",
+        "- Co the dung sang hoac toi tuy nhu cau cap am cua da."
+      ],
+      5: [
+        "- Dung tren da kho rao sau buoc toner, thoa mot lop mong.",
+        "- Tap trung vung da de kho nhu hai ma hoac quanh mieng.",
+        "- Ban ngay co the tiep tuc kem duong va chong nang."
+      ],
+      6: [
+        "- Lay luong vua du, ap san pham len da theo thao tac cham.",
+        "- Ket hop massage nhe de tang cam giac thu gian trong routine.",
+        "- Dung deu buoi toi hoac khi da can duong am ky hon."
+      ],
+      7: [
+        "- Nho 2-3 giot len long ban tay, thoa deu len mat va co.",
+        "- Vo nhe den khi serum tham deu, sau do dung kem duong neu can.",
+        "- Duy tri deu dan de da co cam giac mem min hon."
+      ],
+      8: [
+        "- Dung sau toner, thoa tung lop mong de de kiem soat cam giac tren da.",
+        "- Uu tien vung da thieu am, sau do tiep tuc kem duong khoa am.",
+        "- Co the dung trong routine sang hoac toi khi can bo sung HA/B5."
+      ],
+      9: [
+        "- Thoa mot luong vua du len da sau toner hoac tinh chat long.",
+        "- Dung dau ngon tay vo nhe, tranh keo miet qua manh tren da.",
+        "- Ket hop kem duong phu hop de duy tri cam giac am min."
+      ]
+    };
+    return skincareUsage[storeId] || skincareUsage[7];
   }
 
   const usage = {
@@ -1073,8 +1684,9 @@ function validateVietnameseListingLegacy({ title, detail }) {
   const errors = [];
   const titleText = String(title || "").trim();
   const detailText = String(detail || "").trim();
-  if (titleText.length < 80 || titleText.length > 100) {
-    errors.push("Title must be 80-100 characters.");
+  const titleTextLength = titleLength(titleText);
+  if (titleTextLength < 90 || titleTextLength > 99) {
+    errors.push("Title must be 90-99 characters.");
   }
   if (/\?{2,}|\uFFFD/.test(titleText + detailText)) {
     errors.push("Title and detail must use unaccented ASCII Vietnamese.");
@@ -1096,8 +1708,9 @@ export function validateVietnameseListing({ title, detail }) {
   const foldedTitle = asciiOnly(titleText);
   const foldedText = asciiOnly(combinedText);
 
-  if (titleText.length < BUYER_COPY_STANDARD.titleMin || titleText.length > BUYER_COPY_STANDARD.titleMax) {
-    errors.push("Title must be 80-100 characters.");
+  const titleTextLength = titleLength(titleText);
+  if (titleTextLength < BUYER_COPY_STANDARD.titleMin || titleTextLength > BUYER_COPY_STANDARD.titleMax) {
+    errors.push("Title must be 90-99 characters.");
   }
   if (/\bShopee\b/i.test(combinedText)) {
     errors.push("Title and detail must not contain Shopee.");
@@ -1179,10 +1792,12 @@ function parseStoreIds(value) {
   return stores;
 }
 
-function extractSkuTokens(value) {
+function extractSkuTokens(value, options = {}) {
   const seen = new Set();
   const skus = [];
-  const pattern = /(?:^|[^A-Z0-9])([A-Z]{1,12}\d[A-Z0-9-]{1,20})(?=$|[^A-Z0-9])/gi;
+  const pattern = options.allowNumericItemIds
+    ? /(?:^|[^A-Z0-9])([A-Z]{1,12}\d[A-Z0-9-]{1,20}|\d{8,20})(?=$|[^A-Z0-9])/gi
+    : /(?:^|[^A-Z0-9])([A-Z]{1,12}\d[A-Z0-9-]{1,20})(?=$|[^A-Z0-9])/gi;
   for (const match of String(value || "").matchAll(pattern)) {
     const sku = match[1].toUpperCase();
     if (!seen.has(sku)) {
@@ -1483,22 +2098,118 @@ function compactTitleIdentity(value) {
   return trimWords(identity, 58);
 }
 
+function styleTitleIdentity(value) {
+  const identity = cleanSpaces(value);
+  if (!identity) return identity;
+  const split = splitBrandAndProduct(identity);
+  if (!split.product) return toDoubleStruck(split.brand);
+  return fitStyledTitleIdentity(split);
+}
+
+function splitBrandAndProduct(value) {
+  const identity = cleanSpaces(value);
+  const knownBrands = [
+    "ESTEE LAUDER",
+    "BOBBI BROWN",
+    "L'OCCITANE",
+    "SKINCEUTICALS",
+    "KIEHL'S",
+    "LA MER",
+    "YVES SAINT LAURENT",
+    "SAINT LAURENT",
+    "GIORGIO ARMANI",
+    "MAKE UP FOR EVER",
+    "CHARLOTTE TILBURY",
+    "TOM FORD",
+    "LANCOME",
+    "CLINIQUE",
+    "SHISEIDO",
+    "DIOR",
+    "CHANEL",
+    "GUCCI",
+    "YSL"
+  ].sort((a, b) => b.length - a.length);
+  const folded = asciiOnly(identity).toLowerCase();
+  for (const brand of knownBrands) {
+    const foldedBrand = brand.toLowerCase();
+    if (folded === foldedBrand || folded.startsWith(`${foldedBrand} `)) {
+      return {
+        brand: identity.slice(0, brand.length).trim(),
+        product: identity.slice(brand.length).trim()
+      };
+    }
+  }
+  const [brand = "", ...rest] = identity.split(/\s+/);
+  return { brand, product: rest.join(" ") };
+}
+
+function toDoubleStruck(value) {
+  return mapMathLetters(value, {
+    upperStart: 0x1D538,
+    lowerStart: 0x1D552,
+    digitStart: 0x1D7D8,
+    upperOverrides: {
+      C: "\u2102",
+      H: "\u210D",
+      N: "\u2115",
+      P: "\u2119",
+      Q: "\u211A",
+      R: "\u211D",
+      Z: "\u2124"
+    }
+  });
+}
+
+function fitStyledTitleIdentity(split, maxLength = 70) {
+  const brand = toDoubleStruck(split.brand);
+  const productWords = cleanSpaces(split.product).split(/\s+/).filter(Boolean);
+  let product = productWords.join(" ");
+  let styled = cleanSpaces(`${brand} ${toBoldMath(product)}`);
+  while (productWords.length > 1 && titleLength(styled) > maxLength) {
+    productWords.pop();
+    product = productWords.join(" ");
+    styled = cleanSpaces(`${brand} ${toBoldMath(product)}`);
+  }
+  return titleLength(styled) <= maxLength ? styled : trimWords(styled, maxLength);
+}
+
+function toBoldMath(value) {
+  return mapMathLetters(value, {
+    upperStart: 0x1D400,
+    lowerStart: 0x1D41A,
+    digitStart: 0x1D7CE
+  });
+}
+
+function mapMathLetters(value, { upperStart, lowerStart, digitStart, upperOverrides = {} }) {
+  return Array.from(String(value || ""), (char) => {
+    if (/[A-Z]/.test(char)) return upperOverrides[char] || String.fromCodePoint(upperStart + char.charCodeAt(0) - 65);
+    if (/[a-z]/.test(char)) return String.fromCodePoint(lowerStart + char.charCodeAt(0) - 97);
+    if (/[0-9]/.test(char)) return String.fromCodePoint(digitStart + char.charCodeAt(0) - 48);
+    return char;
+  }).join("");
+}
+
+function titleLength(value) {
+  return Array.from(String(value || "")).length;
+}
+
 function trimWords(value, limit) {
   const words = cleanSpaces(accentVietnameseCopy(value)).split(/\s+/).filter(Boolean);
   let text = "";
   for (const word of words) {
     const candidate = `${text} ${word}`.trim();
-    if (candidate.length > limit) break;
+    if (titleLength(candidate) > limit) break;
     text = candidate;
   }
-  return text || cleanSpaces(accentVietnameseCopy(value)).slice(0, limit).trim();
+  return text || Array.from(cleanSpaces(accentVietnameseCopy(value))).slice(0, limit).join("").trim();
 }
 
 function appendWordsWithinLimit(base, words, limit = 100) {
   let text = cleanSpaces(accentVietnameseCopy(base));
   for (const word of words) {
     const candidate = `${text} ${word}`.trim();
-    if (candidate.length > limit) break;
+    if (titleLength(candidate) > limit) break;
     text = candidate;
   }
   return text;
@@ -1523,12 +2234,12 @@ function renderListingTitle(plan) {
   const normalized = candidates
     .map((candidate) => cleanSpaces(accentVietnameseCopy(candidate).replace(/\s*,\s*/g, ", ")))
     .filter(Boolean);
-  const direct = normalized.find((candidate) => candidate.length >= BUYER_COPY_STANDARD.titleMin && candidate.length <= BUYER_COPY_STANDARD.titleMax);
+  const direct = normalized.find((candidate) => titleLength(candidate) >= BUYER_COPY_STANDARD.titleMin && titleLength(candidate) <= BUYER_COPY_STANDARD.titleMax);
   if (direct) return direct;
 
   const underLimit = normalized
-    .filter((candidate) => candidate.length <= BUYER_COPY_STANDARD.titleMax)
-    .sort((a, b) => b.length - a.length)[0];
+    .filter((candidate) => titleLength(candidate) <= BUYER_COPY_STANDARD.titleMax)
+    .sort((a, b) => titleLength(b) - titleLength(a))[0];
   if (underLimit) return fitTitle(underLimit);
 
   return fitTitle(`${identity} ${phraseSets[0][0]}`);
@@ -1536,12 +2247,18 @@ function renderListingTitle(plan) {
 
 function fitTitle(title) {
   let text = cleanSpaces(accentVietnameseCopy(title));
-  if (text.length > BUYER_COPY_STANDARD.titleMax) return trimWords(text, BUYER_COPY_STANDARD.titleMax).replace(/[,;:.]+$/g, "").trim();
-  const fillerWords = vietnameseText("ph\\u00f9 h\\u1ee3p d\\u00f9ng h\\u1eb1ng ng\\u00e0y cho routine c\\u00e1 nh\\u00e2n d\\u1ec5 s\\u1eed d\\u1ee5ng").split(" ");
+  if (titleLength(text) > BUYER_COPY_STANDARD.titleMax) return trimWords(text, BUYER_COPY_STANDARD.titleMax).replace(/[,;:.]+$/g, "").trim();
+  const fillerPhrases = [
+    vietnameseText("d\\u1ec5 d\\u00f9ng"),
+    vietnameseText("ti\\u1ec7n d\\u00f9ng"),
+    vietnameseText("m\\u1ed7i ng\\u00e0y"),
+    vietnameseText("cho da"),
+    vietnameseText("t\\u1ea1i nh\\u00e0")
+  ];
   let index = 0;
-  while (text.length < BUYER_COPY_STANDARD.titleMin && index < BUYER_COPY_STANDARD.titleMin) {
-    const candidate = `${text} ${fillerWords[index % fillerWords.length]}`.trim();
-    if (candidate.length > BUYER_COPY_STANDARD.titleMax) {
+  while (titleLength(text) < BUYER_COPY_STANDARD.titleMin && index < BUYER_COPY_STANDARD.titleMin) {
+    const candidate = `${text} ${fillerPhrases[index % fillerPhrases.length]}`.trim();
+    if (titleLength(candidate) > BUYER_COPY_STANDARD.titleMax) {
       break;
     }
     text = candidate;
@@ -1617,8 +2334,8 @@ function titlePhraseSetsForStore(storeId, profile) {
         [vietnameseText("L\\u00e0m m\\u1edbi m\\u00e1i t\\u00f3c"), vietnameseText("c\\u1ea3m gi\\u00e1c nh\\u1eb9 h\\u01a1n"), vietnameseText("ch\\u0103m s\\u00f3c t\\u1ea1i nh\\u00e0")]
       ],
       skincare: [
-        [vietnameseText("L\\u00e0m s\\u1ea1ch v\\u00e0 l\\u00e0m m\\u1edbi da"), vietnameseText("c\\u1ea3m gi\\u00e1c tho\\u00e1ng m\\u00e1t"), vietnameseText("ph\\u00f9 h\\u1ee3p ng\\u00e0y n\\u00f3ng \\u1ea9m")],
-        [vietnameseText("Ki\\u1ec3m so\\u00e1t c\\u1ea3m gi\\u00e1c d\\u1ea7u"), vietnameseText("da g\\u1ecdn s\\u1ea1ch h\\u01a1n"), vietnameseText("routine nhanh")]
+        [vietnameseText("C\\u1ea5p \\u1ea9m t\\u01b0\\u01a1i m\\u00e1t"), vietnameseText("serum m\\u1ecfng nh\\u1eb9"), vietnameseText("ph\\u00f9 h\\u1ee3p ng\\u00e0y n\\u00f3ng \\u1ea9m")],
+        [vietnameseText("B\\u1ed5 sung n\\u01b0\\u1edbc cho da"), vietnameseText("c\\u1ea3m gi\\u00e1c nh\\u1eb9 m\\u00e1t"), "routine nhanh"]
       ],
       makeup: [
         [vietnameseText("M\\u00e0u l\\u00ean r\\u00f5 n\\u00e9t"), vietnameseText("d\\u1ec5 t\\u00e1n \\u0111\\u1ec1u"), vietnameseText("ph\\u00f9 h\\u1ee3p nhi\\u1ec1u phong c\\u00e1ch")],
@@ -1669,8 +2386,8 @@ function titlePhraseSetsForStore(storeId, profile) {
         ["Lam Sach Nhe", "Toc De Vao Nep", "Cam Giac Bong Muot"]
       ],
       skincare: [
-        [vietnameseText("L\\u00e0m s\\u1ea1ch s\\u00e2u"), vietnameseText("lo\\u1ea1i b\\u1ecf b\\u1ee5i b\\u1ea9n"), vietnameseText("gi\\u00fap da m\\u1ec1m m\\u1ecbn")],
-        ["Cap Am Nhe", "Lam Diu Be Mat Da", "Phu Hop Dung Hang Ngay"]
+        [vietnameseText("C\\u1ea5p \\u1ea9m cho da"), vietnameseText("gi\\u00fap da m\\u1ec1m m\\u1ecbn"), vietnameseText("r\\u1ea1ng r\\u1ee1 h\\u1eb1ng ng\\u00e0y")],
+        [vietnameseText("L\\u00e0m d\\u1ecbu b\\u1ec1 m\\u1eb7t da"), vietnameseText("d\\u01b0\\u1ee1ng \\u1ea9m nh\\u1eb9"), vietnameseText("ph\\u00f9 h\\u1ee3p routine \\u0111\\u1eb9p")]
       ],
       makeup: [
         ["Mau Min Tu Nhien", "De Tan Tren Da", "Lop Makeup Thanh Lich"],
@@ -1695,8 +2412,8 @@ function titlePhraseSetsForStore(storeId, profile) {
         ["Toc Nhe Hon", "De Chai Va Tao Nep", "Dung Cho Routine Don Gian"]
       ],
       skincare: [
-        [vietnameseText("L\\u00e0m s\\u1ea1ch d\\u1ea7u th\\u1eeba"), vietnameseText("gi\\u1eef da tho\\u00e1ng m\\u00e1t"), vietnameseText("c\\u00e2n b\\u1eb1ng da")],
-        ["Thanh Loc Be Mat Da", "Ket Cau Sach Nhe", "Dung Sang Toi"]
+        [vietnameseText("B\\u1ed5 sung HA B5"), vietnameseText("gi\\u00fap da \\u1ea9m m\\u1ecbn"), vietnameseText("r\\u00f5 c\\u00f4ng d\\u1ee5ng")],
+        [vietnameseText("Serum th\\u1ea5m nhanh"), vietnameseText("c\\u00e2n b\\u1eb1ng \\u0111\\u1ed9 \\u1ea9m"), vietnameseText("routine g\\u1ecdn nh\\u1eb9")]
       ],
       makeup: [
         ["Mau Ro Net", "Ket Cau Min Muot", "Hop Nhieu Phong Cach"],
@@ -1721,8 +2438,8 @@ function titlePhraseSetsForStore(storeId, profile) {
         ["Ho Tro Toc Kho Yeu", "Giam Roi Xao", "Cam Giac Bong Muot"]
       ],
       skincare: [
-        [vietnameseText("Thanh l\\u1ecdc da"), vietnameseText("d\\u01b0\\u1ee1ng \\u1ea9m nh\\u1eb9 nh\\u00e0ng"), vietnameseText("d\\u00f9ng h\\u1eb1ng ng\\u00e0y")],
-        ["Lam Sach Be Mat", "Giup Da Mem Min", "Dung Cho Routine Don Gian"]
+        [vietnameseText("C\\u1ea5p \\u1ea9m nhanh"), vietnameseText("d\\u01b0\\u1ee1ng da m\\u1ec1m m\\u1ecbn"), vietnameseText("d\\u00f9ng h\\u1eb1ng ng\\u00e0y")],
+        [vietnameseText("Serum d\\u1ec5 d\\u00f9ng"), vietnameseText("gi\\u00fap da t\\u01b0\\u01a1i h\\u01a1n"), vietnameseText("routine \\u0111\\u01a1n gi\\u1ea3n")]
       ],
       makeup: [
         ["Len Mau Tu Nhien", "Sang Da Nhe Nhang", "De Dieu Chinh Do Dam"],
@@ -1742,29 +2459,19 @@ function titlePhraseSetsForStore(storeId, profile) {
 }
 
 function productProfile(productName, notes = "") {
+  const nameText = asciiOnly(productName).toLowerCase();
   const text = asciiOnly(`${productName} ${notes}`).toLowerCase();
   const clearLipProduct = /\b(?:lip|balm|rouge|loveshine|candy glow|tinted lip|son\s+(?:duong|moi|bong))\b/.test(text);
   const clearSkinCareProduct = /\b(?:foam cleanser|cleanser|face cleanser|soft clean|toner|lotion|serum|cream|creme|eye|hydrating|soothing|duong am|cap am|sua rua|rua mat|lam sach|thanh loc|nutritious|genifique|night repair|micro essence|estee|lancome|dalba|d alba|truffle)\b/.test(text);
+  const clearMakeupProduct = /\b(?:foundation|skin foundation|kem nen|concealer|cushion|bb cream|cc cream|makeup base|primer|blush|cheek|powder|compact|phan|ma hong|makeup)\b/.test(text);
+  const clearMakeupName = /\b(?:foundation|skin foundation|kem nen|concealer|cushion|bb cream|cc cream|makeup base|primer|blush|cheek|powder|compact|phan|ma hong|makeup)\b/.test(nameText);
+  const clearCleanserName = /\b(?:foam cleanser|face cleanser|cleanser|sua rua|rua mat|nutritious 2-in-1 foam)\b/.test(nameText);
+  const clearSkincareName = /\b(?:serum|hydrating|hyaluronic|b5|ha|duong am|cap am|phuc hoi|lotion|toner|cream|creme|eye|soothing|genifique|night repair|micro essence)\b/.test(nameText);
+  if (clearMakeupName) return makeupProductProfile();
+  if (clearCleanserName) return cleanserProductProfile();
+  if (clearSkincareName) return skincareProductProfile();
   if (/\b(?:foam cleanser|face cleanser|cleanser|sua rua|rua mat|lam sach|thanh loc|nutritious 2-in-1 foam)\b/.test(text)) {
-    return {
-      type: "cleanser",
-      benefits: [
-        "- Lam sach sau bui ban, dau thua va tap chat tren be mat da.",
-        "- Thanh loc lo chan long, ho tro can bang dau tren da.",
-        "- Cap am nhe nha, giam cam giac kho cang sau khi rua mat.",
-        "- Cong thuc diu nhe, phu hop su dung trong routine hang ngay."
-      ],
-      audience: [
-        "- Phu hop da dau, da hon hop va da can lam sach moi ngay.",
-        "- Phu hop nguoi thuong tiep xuc bui ban, nang nong hoac can lam sach sau khi ra ngoai."
-      ],
-      usage: [
-        "- Lam uot mat, lay mot luong sua rua mat vua du ra long ban tay.",
-        "- Tao bot voi nuoc, massage nhe nhang tren mat trong khoang 30 giay.",
-        "- Rua sach hoan toan bang nuoc sach, sau do tiep tuc cac buoc duong da.",
-        "- Co the dung buoi sang va buoi toi tuy nhu cau lam sach cua da."
-      ]
-    };
+    return cleanserProductProfile();
   }
   if (clearLipProduct) {
     return {
@@ -1806,24 +2513,12 @@ function productProfile(productName, notes = "") {
     };
   }
 
+  if (clearMakeupProduct) {
+    return makeupProductProfile();
+  }
+
   if (/\b(skin|serum|cream|creme|lotion|toner|cleanser|clean|eye|hydrating|duong am|cap am|da|truffle|genifique|night repair|micro essence|soft clean|estee|lancome|dalba|d alba)\b/.test(text)) {
-    return {
-      type: "skincare",
-      benefits: [
-        "- Ho tro cap am, lam mem be mat da va giup da co cam giac de chiu hon.",
-        "- Giup cham soc da hang ngay, ho tro duy tri ve ngoai rang ro va min mang.",
-        "- Ket cau de tan, phu hop dung trong routine sang hoac toi tuy nhu cau.",
-        "- Ho tro lam diu cam giac kho cang, giup lop duong tiep theo de bam hon."
-      ],
-      audience: [
-        "- Phu hop nguoi can san pham cham soc da tien loi, de dung hang ngay.",
-        "- Phu hop da can cap am, lam diu, hoac muon routine gon nhe hon."
-      ],
-      usage: [
-        "- Su dung sau buoc lam sach, lay luong vua du va thoa deu len da.",
-        "- Dung deu dan, ket hop kem duong hoac chong nang vao ban ngay neu can."
-      ]
-    };
+    return skincareProductProfile();
   }
 
   if (/\b(blush|cheek|powder|compact|phan|ma hong|makeup)\b/.test(text)) {
@@ -1885,6 +2580,69 @@ function productProfile(productName, notes = "") {
   };
 }
 
+function cleanserProductProfile() {
+  return {
+    type: "cleanser",
+    benefits: [
+      "- Lam sach sau bui ban, dau thua va tap chat tren be mat da.",
+      "- Thanh loc lo chan long, ho tro can bang dau tren da.",
+      "- Cap am nhe nha, giam cam giac kho cang sau khi rua mat.",
+      "- Cong thuc diu nhe, phu hop su dung trong routine hang ngay."
+    ],
+    audience: [
+      "- Phu hop da dau, da hon hop va da can lam sach moi ngay.",
+      "- Phu hop nguoi thuong tiep xuc bui ban, nang nong hoac can lam sach sau khi ra ngoai."
+    ],
+    usage: [
+      "- Lam uot mat, lay mot luong sua rua mat vua du ra long ban tay.",
+      "- Tao bot voi nuoc, massage nhe nhang tren mat trong khoang 30 giay.",
+      "- Rua sach hoan toan bang nuoc sach, sau do tiep tuc cac buoc duong da.",
+      "- Co the dung buoi sang va buoi toi tuy nhu cau lam sach cua da."
+    ]
+  };
+}
+
+function skincareProductProfile() {
+  return {
+    type: "skincare",
+    benefits: [
+      "- Ho tro cap am, lam mem be mat da va giup da co cam giac de chiu hon.",
+      "- Bo sung cam giac am muot, phu hop serum HA/B5 hoac san pham duong da.",
+      "- Ket cau de tan, phu hop dung trong routine sang hoac toi tuy nhu cau.",
+      "- Ho tro lam diu cam giac kho cang, giup lop duong tiep theo de bam hon."
+    ],
+    audience: [
+      "- Phu hop nguoi can san pham cham soc da tien loi, de dung hang ngay.",
+      "- Phu hop da can cap am, lam diu, hoac muon routine gon nhe hon."
+    ],
+    usage: [
+      "- Sau toner, lay luong vua du va thoa deu len da.",
+      "- Dung deu dan, ket hop kem duong hoac chong nang vao ban ngay neu can."
+    ]
+  };
+}
+
+function makeupProductProfile() {
+  return {
+    type: "makeup",
+    benefits: [
+      "- Lop nen tu nhien, giup da trong deu mau va min hon khi trang diem.",
+      "- Ket cau mong nhe, de tan tren da va khong tao cam giac nang mat.",
+      "- Ho tro che phu khuyet diem nho, giup be mat da trong gon dep hon.",
+      "- Phu hop makeup hang ngay, di lam, di choi hoac can lop nen nhanh gon."
+    ],
+    audience: [
+      "- Phu hop nguoi thich lop nen mong nhe, tu nhien va de dieu chinh do che phu.",
+      "- Phu hop trang diem hang ngay khi can da trong deu mau va gon dep hon."
+    ],
+    usage: [
+      "- Lay mot luong vua du, cham len tran, hai ma, mui va cam.",
+      "- Dung mut hoac co tan deu tu giua mat ra ngoai de lop nen min hon.",
+      "- Co the tan them mot lop mong o vung can che phu cao hon."
+    ]
+  };
+}
+
 function storageLines() {
   return [
     "- Bao quan noi kho thoang, tranh anh nang truc tiep va nhiet do cao.",
@@ -1936,6 +2694,48 @@ function benefitsForStore(profile, storeId) {
   }
   const type = profile.type;
   const storeBenefits = {
+    4: {
+      skincare: [
+        "- Bo sung do am diu nhe, giup da co cam giac mem em trong routine moi ngay.",
+        "- Ho tro HA/B5 tao cam giac am muot, phu hop khach uu tien su on dinh.",
+        "- Ket cau de thoa, de phoi voi kem duong ma khong lam routine bi nang.",
+        "- Huong toi cam giac da duoc cham soc gon gang, dang tin cay va de duy tri."
+      ],
+      beauty: [
+        "- Ho tro cham soc nhe nha, phu hop routine moi ngay va de duy tri.",
+        "- Ket cau de dung, giup be mat co cam giac mem em va on dinh hon.",
+        "- Hinh anh san pham gon gang, tao cam giac dang tin cay khi lua chon.",
+        "- De ket hop voi cac buoc cham soc quen thuoc tai nha."
+      ]
+    },
+    5: {
+      skincare: [
+        "- Bo sung cam giac tuoi mat cho da thieu nuoc, phu hop khi can lam moi nhanh.",
+        "- Serum mong nhe, giup da co cam giac nhe mat va am hon sau khi thoa.",
+        "- Phu hop dung ban ngay truoc kem duong hoac makeup mong nhe.",
+        "- Tao cam giac da tuoi hon, de chiu hon trong routine nhanh hang ngay."
+      ],
+      beauty: [
+        "- Mang lai cam giac tuoi moi, phu hop nhu cau lam dep nhanh trong ngay.",
+        "- Ket cau gon nhe, de mang theo va de them vao routine ca nhan.",
+        "- Giup dien mao trong gon gang, de chiu va khong can thao tac cau ky.",
+        "- Phu hop khach thich san pham co cam giac nhe va de dung."
+      ]
+    },
+    6: {
+      skincare: [
+        "- Huong toi cam giac duong am cao cap, giup da trong day am va min hon.",
+        "- Ho tro B5/HA lam diu cam giac kho cang, phu hop routine cham soc ky.",
+        "- Chat gel serum muot, de thoa deu va tao trai nghiem nang niu hon.",
+        "- Phu hop khach uu tien san pham duong da co hinh anh thanh lich va chi chu."
+      ],
+      beauty: [
+        "- Mang lai trai nghiem cham soc cao cap, phu hop khach uu tien su chi chu.",
+        "- Ket cau de thao tac, tao cam giac mem min va tinh te hon khi dung.",
+        "- Hinh anh san pham sang, phu hop mua dung hoac lam qua tang.",
+        "- De ket hop vao routine ca nhan khi can cam giac cham soc ky hon."
+      ]
+    },
     7: {
       lip: [
         "- Duong moi mem min, giup moi co cam giac am va de chiu hon.",
@@ -1982,7 +2782,7 @@ function benefitsForStore(profile, storeId) {
         "- Bao bi gon sang, phu hop nguoi thich san pham de mang theo."
       ],
       skincare: [
-        "- Ho tro bo sung do am, giup da trong mem va can bang hon sau lam sach.",
+        "- Ho tro bo sung do am, giup da trong mem va can bang hon trong routine.",
         "- Ket cau de hap thu, phu hop dung truoc cac buoc duong tiep theo.",
         "- Lam diu cam giac kho cang, cho be mat da co cam giac min hon.",
         "- Phu hop routine gon nhe, ro cong dung va de theo doi hieu qua."
@@ -2078,16 +2878,29 @@ function basePrompt(task, store, siblingStores = []) {
   return [
     `800x800 PNG Vietnamese Shopee ecommerce poster for ${productName}.`,
     "Keep the same product identity and packaging from reference images.",
+    sourceIdentityPrompt(),
     `Use target store style: ${store.style}.`,
     storeDifferentiationPrompt(store, siblingStores),
     imageReviewPrompt(task),
     "Integrated premium ecommerce poster, not pasted collage.",
     "Short readable buyer-facing Vietnamese/English text.",
-    "No authenticity badge, Chinh hang, Ban hang chinh hang, Hang chinh hang, Cam ket, 100%, SKU, Doudou, or orange border."
+    "No authenticity badge from source store, source-store Chinh hang, source-store Cam ket, source-store 100%, SKU, Doudou, or source-store orange border."
   ].filter(Boolean).join(" ");
 }
 
-function storeDifferentiationPrompt(store, siblingStores = []) {
+function sourceIdentityPrompt() {
+  return "Source images are product evidence only: use them for product shape, packaging structure, color, material finish, and real item details. Must look like the same exact SKU/item, not merely the same product category. Preserve the exact visible product set: if references show one bottle plus one retail box, show one bottle plus one retail box. Do not replace the retail box with a second bottle or change the box color, label color, or package material. Do not copy source-store logos, source-store frames, source-store corner badges, Doudou, or source-store layout. Do not reproduce source-store logos even when they appear printed on source packaging; replace them with neutral unbranded packaging areas or hide them with a natural photo angle while keeping the product recognizable. Do not use source-store mascot or sticker graphics as decoration.";
+}
+
+function targetFramePrompt(store) {
+  const profile = STORE_DIFFERENTIATION_BY_ID[store.id] || {};
+  return [
+    "Target store watermark/frame reference controls the store identity, border treatment, corner labels, footer bars, and layout structure while keeping the product packaging accurate.",
+    profile.frame || ""
+  ].filter(Boolean).join(" ");
+}
+
+function storeDifferentiationPrompt(store, siblingStores = [], options = {}) {
   const profile = STORE_DIFFERENTIATION_BY_ID[store.id] || {
     name: "store-specific",
     palette: store.style,
@@ -2097,17 +2910,33 @@ function storeDifferentiationPrompt(store, siblingStores = []) {
     avoid: "copying another selected store's visual system"
   };
   const siblingNames = siblingStores.map((item) => item.label).filter(Boolean);
+  const includeFrameAnchor = options.includeFrameAnchor !== false;
   return [
     `Store differentiation profile: ${profile.name}.`,
     `Palette: ${profile.palette}.`,
     `Composition: ${profile.composition}.`,
     `Background anchor: ${profile.background}.`,
     `Primary buyer hook: ${profile.hook}.`,
+    includeFrameAnchor && profile.frame ? `Target frame anchor: ${profile.frame}` : "",
     `Avoid: ${profile.avoid}.`,
     "Light self-check: keep the same product identity, but avoid being too similar to other target stores; vary composition, background, crop, and benefit hierarchy enough for store-level differentiation.",
     siblingNames.length
       ? `Do not reuse the layout, palette, hero crop, or benefit hierarchy of ${siblingNames.join(" or ")}.`
       : "Keep this store visually distinct from other shops using the same product."
+  ].filter(Boolean).join(" ");
+}
+
+function realPhotoStorePrompt(store, siblingStores = []) {
+  const siblingNames = siblingStores.map((item) => item.label).filter(Boolean);
+  return [
+    `Loose store tone only for Store ${store.id}: use a subtle color mood compatible with ${store.label}, but keep it as a natural real product photo.`,
+    "No store border, no ecommerce frame, no target watermark frame, no corner label, no footer bar, no poster layout.",
+    "Do not add store logos or promotional badges to real photos.",
+    "Do not make the package-front feature list or icon grid the main subject; this should look like a normal buyer real photo, not a product-info package display.",
+    "The package can be angled, partially cropped, side-facing, blurred, or secondary; prioritize the physical item on a real surface.",
+    siblingNames.length
+      ? `Keep the real-photo scene different from ${siblingNames.join(" or ")} by changing angle, surface, crop, lighting, and background.`
+      : "Keep the real-photo scene natural and distinct."
   ].join(" ");
 }
 
@@ -2134,9 +2963,16 @@ function imageReviewPrompt(task) {
   return lines.join(" ");
 }
 
+function storeSlotCompositionPrompt(store, slot) {
+  const composition = STORE_SLOT_COMPOSITION_BY_ID[store.id]?.[slot];
+  if (!composition) return "";
+  return `Store-slot composition lock: ${composition}. Treat this product position, camera angle, crop, and information placement as mandatory; do not replace it with a generic centered card, handheld shot, or vanity tabletop setup.`;
+}
+
 function productPosterPrompt(task, store, siblingStores = []) {
   return [
     basePrompt(task, store, siblingStores),
+    storeSlotCompositionPrompt(store, "product"),
     "Slot role: main product trust poster. Product is the largest subject, brand and product name visible, premium lighting, 2-3 clear benefit bullets, clean ecommerce trust layout."
   ].join(" ");
 }
@@ -2144,6 +2980,7 @@ function productPosterPrompt(task, store, siblingStores = []) {
 function effectPosterPrompt(task, store, siblingStores = []) {
   return [
     basePrompt(task, store, siblingStores),
+    storeSlotCompositionPrompt(store, "effect"),
     "Slot role: benefit and usage-feel poster. Product plus realistic beauty result or usage-feel scene, 3 concise benefit icons, stronger before-use/after-feel visual hierarchy, integrated layout."
   ].join(" ");
 }
@@ -2151,12 +2988,14 @@ function effectPosterPrompt(task, store, siblingStores = []) {
 function realPhotoPrompt(task, store, siblingStores = [], variant) {
   return [
     `800x800 PNG buyer-style real photo for ${task.productName || "the referenced product"}.`,
-    "Keep same product and packaging, natural buyer photo, not official advertisement.",
-    storeDifferentiationPrompt(store, siblingStores),
+    "Keep the same exact item identity: product silhouette, key colors, material finish, packaging size/shape, and recognizable product details must match the source item. It is acceptable to show only part of the set when naturally cropped, but do not change it into another product or generic replacement. Remove or naturally hide any source-store logo/mascot printed on the source packaging; natural buyer photo, not official advertisement.",
+    sourceIdentityPrompt(),
+    realPhotoStorePrompt(store, siblingStores),
     imageReviewPrompt(task),
+    storeSlotCompositionPrompt(store, variant === 1 ? "real1" : "real2"),
     variant === 1
-      ? "Slot role: natural buyer proof photo. Scene: handheld or vanity tabletop photo in natural indoor light, simple real-use context, minimal styling."
-      : "Slot role: alternate buyer proof photo. Scene: casual home desk or bathroom counter photo with a different angle, background, crop distance, and surface material.",
+      ? "Slot role: natural buyer proof photo. Follow the store-slot composition lock exactly while keeping a believable casual buyer-photo finish."
+      : "Slot role: alternate buyer proof photo. Follow the store-slot composition lock exactly and keep package details secondary or naturally partially hidden.",
     "Keep the scene natural and avoid poster text, authenticity badge, SKU, or unrelated watermark."
   ].filter(Boolean).join(" ");
 }

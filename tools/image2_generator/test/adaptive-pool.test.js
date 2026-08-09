@@ -86,6 +86,49 @@ test("rejects when a requeued retryable failure fails again", async () => {
   assert.equal(attempts, 2);
 });
 
+test("continues after failed items when continueOnError is enabled", async () => {
+  const processed = [];
+  const failures = [];
+
+  const result = await runAdaptivePool(["bad", "later"], {
+    maxConcurrency: 1,
+    fallbackConcurrency: 1,
+    isRetryable: () => false,
+    continueOnError: true,
+    onFailure: ({ item, error }) => failures.push({ item, message: error.message })
+  }, async (item) => {
+    processed.push(item);
+    if (item === "bad") throw new Error("bad request");
+  });
+
+  assert.deepEqual(processed, ["bad", "later"]);
+  assert.deepEqual(failures, [{ item: "bad", message: "bad request" }]);
+  assert.equal(result.failures.length, 1);
+  assert.equal(result.failures[0].item, "bad");
+});
+
+test("circuit breaks after too many retryable failures while continuing on error", async () => {
+  const processed = [];
+
+  await assert.rejects(
+    runAdaptivePool(["bad-1", "bad-2", "bad-3", "later"], {
+      maxConcurrency: 1,
+      fallbackConcurrency: 1,
+      isRetryable: (error) => error.retryable === true,
+      continueOnError: true,
+      maxRetryableFailures: 2
+    }, async (item) => {
+      processed.push(item);
+      const error = new Error(`upstream EOF for ${item}`);
+      error.retryable = true;
+      throw error;
+    }),
+    /Too many retryable failures/
+  );
+
+  assert.deepEqual(processed, ["bad-1", "bad-1", "bad-2", "bad-2"]);
+});
+
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

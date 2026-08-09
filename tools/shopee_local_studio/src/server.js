@@ -16,18 +16,27 @@ import {
   buildPreflightReport,
   buildTaskProgress,
   describeImage2Runtime,
+  effectiveBigSellerItemIds,
+  effectiveBigSellerSkuGroup,
+  effectiveImageApiEnv,
   expandProductCodeSkuGroup,
+  extractSourceDraftSkuGroup,
   imageResultMatchesQuery,
   listProductCodeMappings,
   makeListingDraft,
+  normalizeImageApiConfig,
   normalizeImageReview,
   normalizeSourceImages,
   parseTaskText,
   parseSkuGroup,
   pipelineStartBlockers,
+  pipelineStageCompleted,
+  publicImageApiConfig,
+  recordPipelineTiming,
   removeProductCodeMapping,
   requireBuyerProductIdentity,
   resolveTargetStoreIds,
+  shouldAutoConfirmSource,
   shouldShowTask,
   assertSourceReviewReady,
   sourceImagesMissingMessage,
@@ -47,9 +56,11 @@ const publicRoot = path.join(appRoot, "public");
 const dataRoot = path.join(appRoot, "data", "tasks");
 const uploadRoot = path.join(appRoot, "data", "uploads");
 const productCodeMapPath = process.env.PRODUCT_CODE_MAP_PATH || path.join(appRoot, "data", "product-code-map.json");
+const runtimeConfigPath = process.env.RUNTIME_CONFIG_PATH || path.join(appRoot, "data", "runtime-config.json");
 const image2Cli = path.join(workspaceRoot, "tools", "image2_generator", "src", "cli.js");
 const bigSellerRun = path.join(workspaceRoot, "tools", "bigseller_draft_filler", "run.ps1");
 const LISTING_RULE_VERSION = 11;
+const activePipelines = new Set();
 
 await fs.mkdir(dataRoot, { recursive: true });
 await fs.mkdir(uploadRoot, { recursive: true });
@@ -75,6 +86,9 @@ async function route(req, res) {
   if (url.pathname === "/api/health") return sendJson(res, 200, { ok: true });
   if (url.pathname === "/api/stores") return sendJson(res, 200, { stores: STORE_DEFINITIONS });
   if (url.pathname === "/api/store-frames") return sendJson(res, 200, await storeFrameStatus());
+  if (url.pathname === "/api/runtime-config" && req.method === "GET") return sendJson(res, 200, await runtimeConfigResponse());
+  if (url.pathname === "/api/runtime-config" && req.method === "PUT") return sendJson(res, 200, await saveRuntimeConfigRoute(await readJson(req)));
+  if (url.pathname === "/api/runtime-config" && req.method === "DELETE") return sendJson(res, 200, await deleteRuntimeConfigRoute());
   if (url.pathname === "/api/product-code-map" && req.method === "GET") return sendJson(res, 200, await productCodeMapResponse());
   if (parts[0] === "api" && parts[1] === "product-code-map" && parts[2] && req.method === "PUT") return sendJson(res, 200, await upsertProductCodeMapRoute(decodeURIComponent(parts[2]), await readJson(req)));
   if (parts[0] === "api" && parts[1] === "product-code-map" && parts[2] && req.method === "DELETE") return sendJson(res, 200, await deleteProductCodeMapRoute(decodeURIComponent(parts[2])));
@@ -207,6 +221,59 @@ async function saveProductCodeMap(productCodeMap) {
   await fs.writeFile(productCodeMapPath, `${JSON.stringify(productCodeMap, null, 2)}\n`, "utf8");
 }
 
+async function loadRuntimeConfig() {
+  const text = await fs.readFile(runtimeConfigPath, "utf8").catch((error) => {
+    if (error.code === "ENOENT") return "";
+    throw error;
+  });
+  if (!text) return {};
+  return normalizeImageApiConfig(JSON.parse(text));
+}
+
+async function saveRuntimeConfig(config) {
+  await fs.mkdir(path.dirname(runtimeConfigPath), { recursive: true });
+  await fs.writeFile(runtimeConfigPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+}
+
+async function runtimeConfigResponse() {
+  const config = await loadRuntimeConfig();
+  const runtime = await image2RuntimeStatus(config);
+  const publicConfig = publicImageApiConfig({
+    baseUrl: config.baseUrl || runtime.baseUrl,
+    apiKey: config.apiKey || ""
+  });
+  if (!publicConfig.apiKeySet && runtime.apiKeySet) {
+    publicConfig.apiKeySet = true;
+    publicConfig.maskedApiKey = "";
+    publicConfig.apiKeySource = "environment";
+  } else {
+    publicConfig.apiKeySource = publicConfig.apiKeySet ? "local" : "none";
+  }
+  return {
+    path: runtimeConfigPath,
+    config: publicConfig,
+    runtime
+  };
+}
+
+async function saveRuntimeConfigRoute(body) {
+  const current = await loadRuntimeConfig();
+  const apiKey = String(body?.apiKey || "").trim() || current.apiKey || "";
+  const config = normalizeImageApiConfig({
+    baseUrl: body?.baseUrl || current.baseUrl || "https://api.openai.com/v1",
+    apiKey
+  });
+  await saveRuntimeConfig(config);
+  return runtimeConfigResponse();
+}
+
+async function deleteRuntimeConfigRoute() {
+  await fs.rm(runtimeConfigPath, { force: true }).catch((error) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+  return runtimeConfigResponse();
+}
+
 async function productCodeMapResponse() {
   const map = await loadProductCodeMap();
   return {
@@ -314,6 +381,7 @@ async function ensureSourceImages(task) {
   task.sourceDetail = manifest.sourceDetail || "";
   task.sourceRowText = manifest.sourceRowText || "";
   task.sourceMatchedSkuGroup = Array.isArray(manifest.skus) ? manifest.skus : task.skuGroup;
+  task.sourceDraftSkuGroup = extractSourceDraftSkuGroup(manifest);
   task.sourceReviewRequired = true;
   task.sourceConfirmedAt = "";
   task.sourceRejectedAt = "";
@@ -328,36 +396,49 @@ async function ensureSourceImages(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `Loaded ${task.sourceImages.length} source images from 1-store. Review is required before image generation.`);
+  if (task.sourceDraftSkuGroup.length) {
+    await appendLog(task, `[source sku] BigSeller draft search will use SKU: ${task.sourceDraftSkuGroup.join(", ")}.`);
+  }
   await appendLog(task, `[source match] ${task.sourceMatchRisk.level}: ${task.sourceMatchRisk.message} Matched SKU: ${task.sourceMatchRisk.matchedSkus.join(", ") || "none"}.`);
   return task;
 }
 
 async function useFallbackSource(task, reason) {
+  clearSourceEvidence(task);
   task.sourceFallback = true;
   task.sourceFallbackReason = reason;
-  task.sourceImages = [];
-  task.sourceReviewRequired = false;
-  task.sourceConfirmedAt = "";
-  task.sourceRejectedAt = "";
+  task.sourceReviewRequired = true;
+  task.status = "source_lookup_failed";
   task.listingSource = "fallback";
   task.listings = makeListingsForTask(task, { allowFallbackIdentity: true });
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `[source fallback] ${reason}`);
-  await appendLog(task, "[source fallback] Continuing without 1搴?source images. Image jobs will use text-only generation; enter product name/notes for better accuracy.");
+  await appendLog(task, "[source fallback] 1-store source evidence is missing. Upload source images or fix source lookup before continuing.");
   return task;
 }
 
 async function checkSourceProduct(task) {
-  task.sourceImages = [];
-  task.sourceConfirmedAt = "";
-  task.sourceRejectedAt = "";
-  task.sourceReviewRequired = false;
+  clearSourceEvidence(task);
   task.sourceFallback = false;
   task.sourceFallbackReason = "";
   await saveTask(task);
   await appendLog(task, "[source review] Starting 1-store source lookup.");
   return ensureSourceImages(task);
+}
+
+function clearSourceEvidence(task) {
+  task.sourceImages = [];
+  task.sourceEditUrl = "";
+  task.sourceTitle = "";
+  task.sourceDetail = "";
+  task.sourceRowText = "";
+  task.sourceMatchedSkuGroup = [];
+  task.sourceDraftSkuGroup = [];
+  task.sourceMatchRisk = null;
+  task.sourceConfirmedAt = "";
+  task.sourceRejectedAt = "";
+  task.sourceReviewRequired = false;
 }
 
 async function confirmSourceProduct(task) {
@@ -371,6 +452,18 @@ async function confirmSourceProduct(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `[source review] Confirmed 1-store source product: ${task.sourceTitle || task.productName}`);
+  return task;
+}
+
+async function autoConfirmSourceProduct(task) {
+  if (!shouldAutoConfirmSource(task)) return task;
+  task.sourceReviewRequired = true;
+  task.sourceConfirmedAt = new Date().toISOString();
+  task.sourceRejectedAt = "";
+  task.status = "source_auto_confirmed";
+  task.updatedAt = new Date().toISOString();
+  await saveTask(task);
+  await appendLog(task, `[source review] Auto-confirmed 1-store source product by strong Item ID/SKU match: ${task.sourceTitle || task.productName}`);
   return task;
 }
 
@@ -426,9 +519,10 @@ async function writeImage2Config(task) {
 
 async function writeBigSellerConfig(task) {
   await writeListingFiles(task);
+  const bigSellerSkuGroup = effectiveBigSellerSkuGroup(task);
   const config = buildBigSellerSkuConfig({
     productName: task.productName,
-    skuGroup: task.skuGroup,
+    skuGroup: bigSellerSkuGroup,
     assetRoot: task.paths.imagesDir,
     targetStores: task.targetStores
   });
@@ -437,14 +531,18 @@ async function writeBigSellerConfig(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `Wrote BigSeller SKU config: ${task.paths.bigsellerSkuConfig}`);
+  await appendLog(task, `[bigseller sku] Draft lookup SKU: ${bigSellerSkuGroup.join(", ") || "(empty)"}.`);
   return task;
 }
 
 async function writeBigSellerCopyConfig(task) {
   ensureSourceTaskPaths(task);
+  const bigSellerSkuGroup = effectiveBigSellerSkuGroup(task);
+  const bigSellerItemIds = effectiveBigSellerItemIds(task);
   const config = buildBigSellerCopyConfig({
     productName: task.productName,
-    skuGroup: task.skuGroup,
+    skuGroup: bigSellerSkuGroup,
+    itemIds: bigSellerItemIds,
     targetStores: task.targetStores
   });
   await fs.writeFile(task.paths.bigsellerCopyConfig, `${JSON.stringify(config, null, 2)}\n`, "utf8");
@@ -452,6 +550,10 @@ async function writeBigSellerCopyConfig(task) {
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   await appendLog(task, `Wrote BigSeller copy config: ${task.paths.bigsellerCopyConfig}`);
+  await appendLog(task, `[bigseller sku] Copy/draft check SKU: ${bigSellerSkuGroup.join(", ") || "(empty)"}.`);
+  if (bigSellerItemIds.length) {
+    await appendLog(task, `[bigseller item] Source fallback Item ID: ${bigSellerItemIds.join(", ")}.`);
+  }
   return task;
 }
 
@@ -569,6 +671,7 @@ async function runImage2(task, options = {}) {
   task = await ensureSourceImages(task);
   assertSourceReviewReady(task);
   await assertImage2RuntimeReady(task);
+  const imageEnv = await image2ProcessEnv();
   if (options.overwrite) {
     task = await archiveCurrentImages(task, "regenerate-images");
   }
@@ -579,7 +682,7 @@ async function runImage2(task, options = {}) {
     cliPath: image2Cli,
     configPath: task.paths.image2Config,
     overwrite: Boolean(options.overwrite)
-  }), appRoot);
+  }), appRoot, { env: imageEnv });
   return task;
 }
 
@@ -611,6 +714,8 @@ async function runBigSellerCopySourceDrafts(task) {
 }
 
 async function runBigSellerSave(task) {
+  await writeListingFiles(task);
+  await appendLog(task, "Refreshed listing files before BigSeller save.");
   task.status = "saving_bigseller_drafts";
   await saveTask(task);
   runCommand(task, "bigseller_save", "powershell", [
@@ -623,17 +728,22 @@ async function runBigSellerSave(task) {
 }
 
 async function runFullPipeline(task) {
+  if (activePipelines.has(task.id)) {
+    await appendLog(task, "[pipeline] Full pipeline is already running; ignored duplicate start.");
+    return task;
+  }
+  activePipelines.add(task.id);
   task.status = "pipeline_queued";
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
-  await appendLog(task, "Queued full pipeline: images -> BigSeller discover -> save draft.");
+  await appendLog(task, "Queued full pipeline: source -> copy 1-store drafts -> images -> BigSeller discover -> save draft.");
   runPipelineInBackground(task.id);
   return task;
 }
 
 async function runFullPipelineRoute(res, task) {
   const preflight = await taskPreflight(task);
-  const blockers = pipelineStartBlockers(preflight);
+  const blockers = pipelineStartBlockers(preflight, task);
   if (blockers.length) {
     await appendLog(task, `[preflight] ${preflight.status}: ${blockers.map((item) => item.message).join(" ")}`);
     task.status = "preflight_blocked";
@@ -646,41 +756,80 @@ async function runFullPipelineRoute(res, task) {
 
 async function runPipelineInBackground(taskId) {
   let task = await readTask(taskId).catch(() => null);
-  if (!task) return;
+  if (!task) {
+    activePipelines.delete(taskId);
+    return;
+  }
+  const resumeTask = structuredClone(task);
   try {
-    await updateStatus(task, "pipeline_generating_images");
+    await updateStatus(task, "pipeline_queued");
     task = await ensureSourceImages(task);
     if (!sourceReviewState(task).ready) {
-      await appendLog(task, "[source review] Full pipeline paused. Confirm the 1-store source product, then run the full pipeline again.");
-      return;
+      task = await autoConfirmSourceProduct(task);
+      if (!sourceReviewState(task).ready) {
+        await appendLog(task, "[source review] Full pipeline paused. Confirm the 1-store source product, then run the full pipeline again.");
+        return;
+      }
     }
-    await assertImage2RuntimeReady(task);
-    task = await archiveCurrentImages(task, "full-pipeline-rerun");
-    await writeImage2Config(task);
-    await runCommandAsync(task, "image2", process.execPath, buildImage2CliArgs({
-      cliPath: image2Cli,
-      configPath: task.paths.image2Config
-    }), appRoot);
 
     task = await readTask(taskId);
-    await updateStatus(task, "pipeline_discovering_bigseller_drafts");
-    await writeBigSellerConfig(task);
-    await runCommandAsync(task, "bigseller_discover", "powershell", [
-      "-ExecutionPolicy", "Bypass",
-      "-File", bigSellerRun,
-      "-Config", task.paths.bigsellerSkuConfig,
-      "-Discover",
-      "-Out", task.paths.bigsellerJobsConfig
-    ], path.dirname(bigSellerRun));
+    let hasDiscoveredConfig = await fileExists(task.paths.bigsellerJobsConfig);
+    if (pipelineStageCompleted(resumeTask, "bigseller_copy", { hasDiscoveredConfig })) {
+      await appendLog(task, "[pipeline resume] Skip BigSeller copy; target drafts were already copied.");
+    } else {
+      await updateStatus(task, "pipeline_copying_source_to_bigseller_drafts");
+      await writeBigSellerCopyConfig(task);
+      await runCommandAsync(task, "bigseller_copy", "powershell", [
+        "-ExecutionPolicy", "Bypass",
+        "-File", bigSellerRun,
+        "-Config", task.paths.bigsellerCopyConfig,
+        "-Copy"
+      ], path.dirname(bigSellerRun));
+    }
 
     task = await readTask(taskId);
-    await updateStatus(task, "pipeline_saving_bigseller_drafts");
-    await runCommandAsync(task, "bigseller_save", "powershell", [
-      "-ExecutionPolicy", "Bypass",
-      "-File", bigSellerRun,
-      "-Config", task.paths.bigsellerJobsConfig,
-      "-Save"
-    ], path.dirname(bigSellerRun));
+    const imageCount = (await listImages(task)).length;
+    if (pipelineStageCompleted(resumeTask, "image_generation", { imageCount })) {
+      await appendLog(task, `[pipeline resume] Skip image generation; ${imageCount} generated image(s) already exist.`);
+    } else {
+      await updateStatus(task, "pipeline_generating_images");
+      await assertImage2RuntimeReady(task);
+      const imageEnv = await image2ProcessEnv();
+      task = await archiveCurrentImages(task, "full-pipeline-rerun");
+      await writeImage2Config(task);
+      await runCommandAsync(task, "image2", process.execPath, buildImage2CliArgs({
+        cliPath: image2Cli,
+        configPath: task.paths.image2Config
+      }), appRoot, { env: imageEnv });
+    }
+
+    task = await readTask(taskId);
+    if (pipelineStageCompleted(resumeTask, "bigseller_discover", { hasDiscoveredConfig: await fileExists(task.paths.bigsellerJobsConfig) })) {
+      await appendLog(task, "[pipeline resume] Skip BigSeller discover; draft links were already discovered.");
+    } else {
+      await updateStatus(task, "pipeline_discovering_bigseller_drafts");
+      await writeBigSellerConfig(task);
+      await runCommandAsync(task, "bigseller_discover", "powershell", [
+        "-ExecutionPolicy", "Bypass",
+        "-File", bigSellerRun,
+        "-Config", task.paths.bigsellerSkuConfig,
+        "-Discover",
+        "-Out", task.paths.bigsellerJobsConfig
+      ], path.dirname(bigSellerRun));
+    }
+
+    task = await readTask(taskId);
+    if (pipelineStageCompleted(resumeTask, "bigseller_save")) {
+      await appendLog(task, "[pipeline resume] Skip BigSeller save; drafts were already saved.");
+    } else {
+      await updateStatus(task, "pipeline_saving_bigseller_drafts");
+      await runCommandAsync(task, "bigseller_save", "powershell", [
+        "-ExecutionPolicy", "Bypass",
+        "-File", bigSellerRun,
+        "-Config", task.paths.bigsellerJobsConfig,
+        "-Save"
+      ], path.dirname(bigSellerRun));
+    }
 
     task = await readTask(taskId);
     await updateStatus(task, "pipeline_done");
@@ -691,7 +840,14 @@ async function runPipelineInBackground(taskId) {
       await updateStatus(task, "pipeline_failed");
       await appendLog(task, `[pipeline] ${error.message}`);
     }
+  } finally {
+    activePipelines.delete(taskId);
   }
+}
+
+async function fileExists(filePath) {
+  if (!filePath) return false;
+  return fs.access(filePath).then(() => true, () => false);
 }
 
 async function archiveCurrentImages(task, reason) {
@@ -724,9 +880,10 @@ function imageArchiveId() {
 }
 
 async function assertImage2RuntimeReady(task) {
-  const runtime = describeImage2Runtime(process.env);
+  const config = await loadRuntimeConfig();
+  const runtime = describeImage2Runtime(process.env, config);
   if (!runtime.apiKeySet) {
-    await markImage2PreflightFailed(task, "Missing OPENAI_API_KEY. Set it before starting Shopee Local Studio.");
+    await markImage2PreflightFailed(task, "Missing image API key. Configure it in Shopee Local Studio before generating images.");
   }
   if (runtime.invalidBaseUrl) {
     await markImage2PreflightFailed(task, `Invalid OPENAI_BASE_URL: ${runtime.baseUrl}`);
@@ -762,11 +919,15 @@ function canConnect(host, port, timeoutMs) {
   });
 }
 
-function runCommand(task, label, command, args, cwd) {
+async function image2ProcessEnv() {
+  return effectiveImageApiEnv(process.env, await loadRuntimeConfig());
+}
+
+function runCommand(task, label, command, args, cwd, options = {}) {
   appendLog(task, `[${label}] ${command} ${args.join(" ")}`);
   const child = spawn(command, args, {
     cwd,
-    env: process.env,
+    env: options.env || process.env,
     windowsHide: true
   });
   child.stdout.on("data", (chunk) => appendLog(task, chunk.toString()));
@@ -780,12 +941,12 @@ function runCommand(task, label, command, args, cwd) {
   });
 }
 
-function runCommandAsync(task, label, command, args, cwd) {
+function runCommandAsync(task, label, command, args, cwd, options = {}) {
   appendLog(task, `[${label}] ${command} ${args.join(" ")}`);
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      env: process.env,
+      env: options.env || process.env,
       windowsHide: true
     });
     child.stdout.on("data", (chunk) => appendLog(task, chunk.toString()));
@@ -800,8 +961,10 @@ function runCommandAsync(task, label, command, args, cwd) {
 }
 
 async function updateStatus(task, status) {
+  const now = new Date().toISOString();
   task.status = status;
-  task.updatedAt = new Date().toISOString();
+  task.pipelineTiming = recordPipelineTiming(task.pipelineTiming, status, now) || task.pipelineTiming;
+  task.updatedAt = now;
   await saveTask(task);
 }
 
@@ -820,8 +983,8 @@ async function taskPreflight(task) {
   });
 }
 
-async function image2RuntimeStatus() {
-  const runtime = describeImage2Runtime(process.env);
+async function image2RuntimeStatus(config = null) {
+  const runtime = describeImage2Runtime(process.env, config ?? await loadRuntimeConfig());
   if (runtime.localProxy) {
     runtime.localProxyReachable = await canConnect(runtime.localProxy.host, runtime.localProxy.port, 1500);
   }
@@ -1070,7 +1233,7 @@ async function serveStatic(req, res, pathname) {
   }[path.extname(filePath)] || "application/octet-stream";
   const bytes = await fs.readFile(filePath).catch(() => null);
   if (!bytes) return sendText(res, 404, "Not found");
-  res.writeHead(200, { "Content-Type": contentType });
+  res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store" });
   res.end(bytes);
 }
 

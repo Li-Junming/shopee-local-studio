@@ -17,6 +17,7 @@ export function normalizeConfig(raw, configPath = process.cwd()) {
   const outputFormat = raw.outputFormat || raw.output_format || raw.default?.output_format || "png";
   const outputSize = Number(raw.outputSize || raw.output_size || 800);
   const concurrency = Number(raw.concurrency || 2);
+  const maxRetryableFailures = Number(raw.maxRetryableFailures ?? raw.max_retryable_failures ?? 3);
   const imageField = raw.imageField || "image";
 
   if (!Number.isInteger(outputSize) || outputSize < 100) {
@@ -24,6 +25,9 @@ export function normalizeConfig(raw, configPath = process.cwd()) {
   }
   if (!Number.isInteger(concurrency) || concurrency < 1) {
     throw new Error("concurrency must be an integer >= 1.");
+  }
+  if (!Number.isInteger(maxRetryableFailures) || maxRetryableFailures < 1) {
+    throw new Error("maxRetryableFailures must be an integer >= 1.");
   }
 
   const jobs = raw.jobs.map((job, index) => normalizeJob(job, {
@@ -37,7 +41,7 @@ export function normalizeConfig(raw, configPath = process.cwd()) {
     imageField
   }));
 
-  return { model, baseUrl, size, quality, outputFormat, outputSize, concurrency, outputDir, imageField, jobs };
+  return { model, baseUrl, size, quality, outputFormat, outputSize, concurrency, maxRetryableFailures, outputDir, imageField, jobs };
 }
 
 function normalizeBaseUrl(value) {

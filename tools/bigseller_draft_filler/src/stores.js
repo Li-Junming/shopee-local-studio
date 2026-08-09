@@ -5,16 +5,12 @@ export function normalizeStoreText(value) {
     .toLowerCase();
 }
 
-export function identifyStore(pageText, storeMap) {
+export function identifyStore(pageText, storeMap, fallbackText = "") {
   if (!Array.isArray(storeMap) || storeMap.length === 0) {
     throw new Error("storeMap must contain at least one store mapping.");
   }
 
-  const normalizedPageText = normalizeStoreText(pageText);
-  const match = storeMap.find((entry) => {
-    const candidate = normalizeStoreText(entry.match);
-    return candidate.length > 0 && normalizedPageText.includes(candidate);
-  });
+  const match = findStoreInText(pageText, storeMap) || findStoreInText(fallbackText, storeMap);
 
   if (!match) {
     const configured = storeMap.map((entry) => entry.match).join(", ");
@@ -22,4 +18,13 @@ export function identifyStore(pageText, storeMap) {
   }
 
   return match;
+}
+
+function findStoreInText(text, storeMap) {
+  const normalizedText = normalizeStoreText(text);
+  if (!normalizedText) return null;
+  return storeMap.find((entry) => {
+    const candidate = normalizeStoreText(entry.match);
+    return candidate.length > 0 && normalizedText.includes(candidate);
+  }) || null;
 }

@@ -8,36 +8,73 @@
   </head>
   <body>
     <header class="topbar">
-      <div>
+      <div class="brand-block">
+        <span class="brand-mark">SL</span>
+        <div>
         <h1>Shopee Local Studio</h1>
-        <p>&#21830;&#21697;&#32534;&#30721;/SKU &#20219;&#21153; &middot; &#24215;&#38138;&#22270;&#32452; &middot; &#33609;&#31295;&#31665;&#33258;&#21160;&#20445;&#23384;</p>
+        <p>Item ID/SKU &#20219;&#21153; &middot; &#24215;&#38138;&#22270;&#32452; &middot; &#33609;&#31295;&#31665;&#33258;&#21160;&#20445;&#23384;</p>
+        </div>
       </div>
       <button id="refreshBtn" type="button">&#21047;&#26032;</button>
     </header>
 
     <main class="layout">
       <section class="panel create-panel">
-        <h2>&#26032;&#20219;&#21153;</h2>
+        <div class="panel-title">
+          <span class="eyebrow">&#26085;&#24120;&#20837;&#21475;</span>
+          <h2>&#26032;&#20219;&#21153;</h2>
+        </div>
 
-        <div class="quick-box">
+        <details class="api-config-section advanced-section" open>
+          <summary>
+            <span>API &#37197;&#32622;</span>
+            <small>&#29983;&#22270;&#25509;&#21475;&#21644;&#23494;&#38053;</small>
+          </summary>
+          <form id="apiConfigForm" class="api-config-form">
+            <div id="apiConfigStatus" class="api-config-status">&#27491;&#22312;&#26816;&#27979; API &#37197;&#32622;...</div>
+            <label>
+              &#25509;&#21475; URL
+              <input id="apiBaseUrl" name="baseUrl" autocomplete="off" placeholder="https://api.openai.com/v1">
+            </label>
+            <label>
+              API &#23494;&#38053;
+              <input id="apiKey" name="apiKey" type="password" autocomplete="new-password" placeholder="&#30041;&#31354;&#34920;&#31034;&#20445;&#25345;&#24050;&#20445;&#23384;&#23494;&#38053;">
+            </label>
+            <div class="inline-actions">
+              <button id="saveApiConfigBtn" class="primary" type="submit">&#20445;&#23384;&#37197;&#32622;</button>
+              <button id="testApiConfigBtn" type="button">&#37325;&#26032;&#26816;&#27979;</button>
+              <button id="clearApiConfigBtn" class="danger" type="button">&#28165;&#38500;&#37197;&#32622;</button>
+            </div>
+            <p id="apiKeyStatus" class="hint">&#23494;&#38053;&#21482;&#20445;&#23384;&#22312;&#26412;&#26426;&#65292;&#39029;&#38754;&#19981;&#20250;&#26174;&#31034;&#23436;&#25972;&#23494;&#38053;&#12290;</p>
+          </form>
+        </details>
+
+        <div class="workflow-card">
+          <div class="quick-box">
           <label>
-            &#31896;&#36148;&#21830;&#21697;&#32534;&#30721;/SKU
-            <textarea id="quickTaskText" rows="8" placeholder="&#21830;&#21697;&#32534;&#30721;&#65306;YSLD80501&#10;SKU&#65306;YSLD80501 YSLD80502&#10;&#30452;&#25509;&#31896;&#36148;&#32534;&#30721;&#21363;&#21487;&#65292;&#40664;&#35748;&#33258;&#21160;&#29983;&#25104; 4-9 &#24215;"></textarea>
+            &#31896;&#36148; Item ID/SKU
+            <textarea id="quickTaskText" rows="8" placeholder="Item ID: YSLD80501&#10;SKU: YSLD80501 YSLD80502&#10;&#30452;&#25509;&#31896;&#36148; Item ID &#25110; SKU&#65292;&#40664;&#35748;&#33258;&#21160;&#29983;&#25104; 4-9 &#24215;"></textarea>
           </label>
           <div class="inline-actions">
             <button id="parseQuickBtn" type="button">&#35299;&#26512;&#21040;&#34920;&#21333;</button>
-            <button id="createRunBtn" class="primary" type="button">&#19968;&#38190;&#24320;&#22987;&#33258;&#21160;&#29983;&#25104;</button>
+            <button id="createRunBtn" class="primary" type="button">&#21019;&#24314;&#24182;&#24320;&#22987;</button>
           </div>
-          <p class="hint">&#21482;&#38656;&#36755;&#20837;&#21830;&#21697;&#32534;&#30721;&#25110; SKU&#65307;&#31995;&#32479;&#20250;&#33258;&#21160;&#20351;&#29992; 4-9 &#24215;&#36793;&#26694;&#21644;&#24215;&#38138;&#39118;&#26684;&#29983;&#25104;&#22270;&#12290;1 &#24215;&#21830;&#21697;&#38656;&#35201;&#30830;&#35748;&#26102;&#20250;&#20808;&#26242;&#20572;&#65292;&#30830;&#35748;&#21518;&#20877;&#28857;&#19968;&#38190;&#32487;&#32493;&#12290;</p>
+          <p class="hint">&#21482;&#38656;&#36755;&#20837; Item ID &#25110; SKU&#65307;&#31995;&#32479;&#20250;&#33258;&#21160;&#20351;&#29992; 4-9 &#24215;&#36793;&#26694;&#21644;&#24215;&#38138;&#39118;&#26684;&#29983;&#25104;&#22270;&#12290;1 &#24215;&#21830;&#21697;&#38656;&#35201;&#30830;&#35748;&#26102;&#20250;&#20808;&#26242;&#20572;&#65292;&#30830;&#35748;&#21518;&#20877;&#28857;&#19968;&#38190;&#32487;&#32493;&#12290;</p>
+          </div>
         </div>
 
-        <form id="taskForm">
+        <details class="advanced-section">
+          <summary>
+            <span>&#39640;&#32423;&#36755;&#20837;</span>
+            <small>&#25163;&#21160;&#34917;&#20805;&#22270;&#29255;&#12289;&#35201;&#28857;&#21644;&#24215;&#38138;</small>
+          </summary>
+          <form id="taskForm">
           <label>
             &#20135;&#21697;&#21517;&#31216;
             <input name="productName" autocomplete="off" placeholder="&#20363;&#22914; Estee Lauder Soft Clean Infusion">
           </label>
           <label>
-            &#21830;&#21697;&#32534;&#30721;/SKU &#32452;
+            Item ID/SKU &#32452;
             <textarea name="skuGroup" rows="3" placeholder="YSLD80501 YSLD80502"></textarea>
           </label>
           <div class="field">
@@ -59,16 +96,22 @@
           </label>
           <button class="primary" type="submit">&#21019;&#24314;&#20219;&#21153;</button>
         </form>
+        </details>
 
-        <section class="map-manager">
+        <details class="advanced-section">
+          <summary>
+            <span>Item ID &#26144;&#23556;</span>
+            <small>Item ID -&gt; SKU</small>
+          </summary>
+          <section class="map-manager">
           <div class="section-head compact">
-            <h3>&#21830;&#21697;&#32534;&#30721;&#26144;&#23556;</h3>
+            <h3>Item ID &#26144;&#23556;</h3>
             <button id="reloadProductCodeMapBtn" type="button">&#21047;&#26032;</button>
           </div>
           <form id="productCodeMapForm">
             <label>
-              &#21830;&#21697;&#32534;&#30721;
-              <input name="productCode" autocomplete="off" placeholder="PC001">
+              Item ID
+              <input name="productCode" autocomplete="off" placeholder="ITEM001">
             </label>
             <label>
               SKU &#32452;
@@ -81,26 +124,49 @@
           </form>
           <div id="productCodeMapList" class="map-list"></div>
         </section>
+        </details>
       </section>
 
       <section class="panel work-panel">
-        <div class="section-head">
-          <h2>&#20219;&#21153;</h2>
+        <div class="section-head workspace-head">
+          <div class="panel-title">
+            <span class="eyebrow">&#24037;&#20316;&#21488;</span>
+            <h2>&#20219;&#21153;</h2>
+          </div>
+        </div>
+
+        <details class="task-switcher advanced-section">
+          <summary>
+            <span>&#20999;&#25442;/&#25628;&#32034;&#20219;&#21153;</span>
+            <small>&#21382;&#21490;&#20219;&#21153;&#12289;&#24402;&#26723;&#31579;&#36873;</small>
+          </summary>
           <div class="task-picker">
-            <input id="taskSearch" type="search" placeholder="&#25628;&#32034; &#21830;&#21697;&#32534;&#30721; / SKU / &#20135;&#21697; / &#29366;&#24577; / store:9">
+            <input id="taskSearch" type="search" placeholder="&#25628;&#32034; Item ID / SKU / &#20135;&#21697; / &#29366;&#24577; / store:9">
             <label class="archive-toggle">
               <input id="showArchived" type="checkbox">
               &#26174;&#31034;&#24402;&#26723;
             </label>
             <select id="taskSelect"></select>
           </div>
-        </div>
+          <section class="archived-manager">
+            <div class="section-head compact">
+              <h3>&#24050;&#24402;&#26723;&#20219;&#21153;</h3>
+              <button id="reloadArchivedTasksBtn" type="button">&#21047;&#26032;&#24402;&#26723;</button>
+            </div>
+            <div id="archivedTaskList" class="archived-task-list"></div>
+          </section>
+        </details>
 
-        <section class="results-library">
+        <details class="results-library advanced-section">
+          <summary>
+            <span>&#22270;&#29255;&#32467;&#26524;&#24211;</span>
+            <small>&#21382;&#21490;&#29983;&#25104;&#22270;&#12289;&#19979;&#36733;&#21644;&#36136;&#26816;</small>
+          </summary>
+          <section class="results-panel">
           <div class="section-head">
             <h3>&#22270;&#29255;&#32467;&#26524;&#24211;</h3>
             <div class="task-picker result-picker">
-              <input id="imageResultSearch" type="search" placeholder="&#25628;&#32034; &#21830;&#21697;&#32534;&#30721; / SKU / &#24215;&#38138; / &#29366;&#24577;">
+              <input id="imageResultSearch" type="search" placeholder="&#25628;&#32034; Item ID / SKU / &#24215;&#38138; / &#29366;&#24577;">
               <label class="archive-toggle">
                 <input id="showArchivedResults" type="checkbox">
                 &#26174;&#31034;&#24402;&#26723;
@@ -110,35 +176,52 @@
           </div>
           <div id="imageResults" class="result-list"></div>
         </section>
+        </details>
 
         <div id="emptyState" class="empty">&#26242;&#26080;&#20219;&#21153;</div>
         <div id="taskView" hidden>
-          <div class="summary-grid">
-            <div><span>&#20135;&#21697;</span><strong id="taskProduct"></strong></div>
-            <div><span>&#21830;&#21697;&#32534;&#30721;/SKU</span><strong id="taskSkus"></strong></div>
-            <div><span>&#29366;&#24577;</span><strong id="taskStatus"></strong></div>
-            <div><span>&#24402;&#26723;</span><strong id="taskArchived"></strong></div>
-          </div>
-          <div id="storeFrameStatus" class="frame-status"></div>
-          <div id="pipelineProgressPanel" class="pipeline-progress"></div>
-          <div id="preflightPanel" class="preflight-panel"></div>
-          <div id="sourceReviewPanel" class="source-review"></div>
+          <section class="workflow-card task-command">
+            <div class="summary-grid">
+              <div><span>&#20135;&#21697;</span><strong id="taskProduct"></strong></div>
+              <div><span>Item ID/SKU</span><strong id="taskSkus"></strong></div>
+              <div><span>&#29366;&#24577;</span><strong id="taskStatus"></strong></div>
+              <div><span>&#24402;&#26723;</span><strong id="taskArchived"></strong></div>
+            </div>
+            <div id="storeFrameStatus" class="frame-status"></div>
+            <div id="pipelineProgressPanel" class="pipeline-progress"></div>
+            <div id="preflightPanel" class="preflight-panel"></div>
+            <div id="sourceReviewPanel" class="source-review"></div>
 
-          <div class="actions">
+            <div class="workflow-actions">
             <button id="runAllBtn" class="primary" type="button">&#19968;&#38190;&#24320;&#22987;/&#32487;&#32493;&#33258;&#21160;&#27969;&#31243;</button>
+              <button id="copySourceDraftsBtn" type="button">&#22797;&#21046;1&#24215;&#21040;4-9&#33609;&#31295;&#31665;</button>
             <button id="downloadTaskBtn" type="button">&#19979;&#36733;&#22270;&#29255;&#21253;</button>
+            </div>
+          </section>
+
+          <details class="advanced-section">
+            <summary>
+              <span>&#39640;&#32423;&#25805;&#20316;</span>
+              <small>&#37197;&#32622;&#12289;&#37325;&#29983;&#12289;&#33609;&#31295;&#31665;&#21644;&#32500;&#25252;</small>
+            </summary>
+            <div class="actions">
             <button id="archiveBtn" type="button">&#24402;&#26723;&#20219;&#21153;</button>
             <button id="writeImageConfigBtn" type="button">&#29983;&#25104;&#22270;&#29255;&#37197;&#32622;</button>
             <button id="generateBtn" type="button">&#29983;&#25104;&#22270;&#29255;</button>
             <button id="regenerateImagesBtn" type="button">&#37325;&#26032;&#29983;&#25104;&#22270;&#29255;</button>
-            <button id="copySourceDraftsBtn" type="button">&#22797;&#21046;1&#24215;&#21040;4-9&#33609;&#31295;&#31665;</button>
             <button id="writeBigsellerBtn" type="button">&#29983;&#25104;&#33609;&#31295;&#37197;&#32622;</button>
             <button id="discoverBtn" type="button">&#26597;&#25214;&#33609;&#31295;</button>
             <button id="saveBtn" class="danger" type="button">&#20445;&#23384;&#33609;&#31295;</button>
             <button id="deleteTaskBtn" class="danger" type="button">&#21024;&#38500;&#20219;&#21153;</button>
           </div>
+          </details>
 
-          <div class="section-head">
+          <details class="advanced-section content-section">
+            <summary>
+              <span>&#26631;&#39064;&#35814;&#24773;</span>
+              <small>&#21508;&#24215;&#25991;&#26696;&#32534;&#36753;</small>
+            </summary>
+            <div class="section-head">
             <h3>&#26631;&#39064;&#35814;&#24773;</h3>
             <div class="inline-actions">
               <button id="regenerateListingsBtn" type="button">&#37325;&#26032;&#29983;&#25104;&#26631;&#39064;&#35814;&#24773;</button>
@@ -146,8 +229,10 @@
             </div>
           </div>
           <div id="listingEditors" class="listing-grid"></div>
+          </details>
 
-          <div class="section-head">
+          <section class="preview-section">
+            <div class="section-head">
             <h3>&#22270;&#29255;&#39044;&#35272;</h3>
             <div class="inline-actions preview-tools">
               <input id="taskImageSearch" type="search" placeholder="&#31579;&#36873; store:4 / 01_product / effect">
@@ -155,12 +240,19 @@
             </div>
           </div>
           <div id="imageGrid" class="image-grid"></div>
+          </section>
 
-          <div class="section-head">
+          <details class="advanced-section log-section">
+            <summary>
+              <span>&#26085;&#24535;</span>
+              <small>&#21518;&#21488;&#25191;&#34892;&#32454;&#33410;</small>
+            </summary>
+            <div class="section-head">
             <h3>&#26085;&#24535;</h3>
             <button id="reloadLogsBtn" type="button">&#21047;&#26032;&#26085;&#24535;</button>
           </div>
           <pre id="logs" class="logs"></pre>
+          </details>
         </div>
       </section>
     </main>

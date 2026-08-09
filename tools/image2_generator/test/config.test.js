@@ -16,6 +16,7 @@ test("normalizes defaults and resolves job output paths", () => {
   assert.equal(config.size, "1024x1024");
   assert.equal(config.outputSize, 800);
   assert.equal(config.concurrency, 2);
+  assert.equal(config.maxRetryableFailures, 3);
   assert.equal(config.jobs[0].endpoint, "generations");
   assert.equal(config.jobs[1].endpoint, "edits");
   assert.match(config.jobs[0].outputPath, /outputs[\\/]demo[\\/]store_7[\\/]01_main\.png$/);
@@ -24,6 +25,19 @@ test("normalizes defaults and resolves job output paths", () => {
 test("rejects jobs without prompts or output filenames", () => {
   assert.throws(() => normalizeConfig({ jobs: [{ name: "bad" }] }, "C:/work/jobs.json"), /prompt/);
   assert.throws(() => normalizeConfig({ jobs: [{ prompt: "x" }] }, "C:/work/jobs.json"), /out/);
+});
+
+test("accepts a configured retryable failure circuit breaker", () => {
+  const config = withoutOpenAiBaseUrl(() => normalizeConfig({
+    maxRetryableFailures: 2,
+    jobs: [{ prompt: "x", out: "a.png" }]
+  }, "C:/work/jobs.json"));
+
+  assert.equal(config.maxRetryableFailures, 2);
+  assert.throws(() => normalizeConfig({
+    maxRetryableFailures: 0,
+    jobs: [{ prompt: "x", out: "a.png" }]
+  }, "C:/work/jobs.json"), /maxRetryableFailures/);
 });
 
 test("accepts accidentally pasted markdown-style base URLs", () => {

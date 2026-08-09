@@ -54,3 +54,27 @@ test("retries transient upstream image API errors", async () => {
   assert.equal(bytes.toString(), "pngdata");
   assert.equal(attempts, 2);
 });
+
+test("times out stalled image API requests as retryable failures", async () => {
+  await assert.rejects(
+    callImageApi({
+      config: { baseUrl: "https://api.example.com/v1" },
+      job: {
+        endpoint: "generations",
+        model: "gpt-image-2",
+        prompt: "make image",
+        size: "1024x1024",
+        quality: "low",
+        n: 1,
+        outputFormat: "png"
+      },
+      apiKey: "test-key",
+      fetchImpl: () => new Promise(() => {}),
+      maxAttempts: 1,
+      timeoutMs: 5
+    }),
+    /timed out after 5ms/
+  );
+
+  assert.equal(isRetryableImageError(new Error("Image API request timed out after 5ms")), true);
+});
