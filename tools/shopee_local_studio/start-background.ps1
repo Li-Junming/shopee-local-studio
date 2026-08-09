@@ -51,7 +51,7 @@ function Wait-Health {
 
 Import-SavedEnv
 if (-not $env:OPENAI_API_KEY) {
-  throw "OPENAI_API_KEY is not set. Save it first, then rerun this script."
+  Write-Output "OPENAI_API_KEY is not set. Open the Studio and save API config in the left panel."
 }
 if (-not $env:OPENAI_BASE_URL) {
   $env:OPENAI_BASE_URL = "https://api.openai.com/v1"

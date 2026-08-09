@@ -1,0 +1,38 @@
+Shopee Local Studio GitHub 部署说明
+
+仓库：
+https://github.com/Li-Junming/shopee-local-studio
+
+建议目录：
+C:\ShopeeLocalStudio
+
+第一次部署：
+1. 安装 Node.js LTS。
+2. 安装 Google Chrome。
+3. 打开 PowerShell，运行：
+   git clone https://github.com/Li-Junming/shopee-local-studio.git C:\ShopeeLocalStudio\ni
+   cd C:\ShopeeLocalStudio\ni
+   powershell -ExecutionPolicy Bypass -File .\首次部署.ps1
+4. 浏览器打开 http://127.0.0.1:3777。
+5. 在左侧 API 配置里填写接口 URL 和 API 密钥。
+6. 登录 BigSeller：
+   cd C:\ShopeeLocalStudio\ni\tools\bigseller_draft_filler
+   powershell -ExecutionPolicy Bypass -File .\run.ps1 -Login
+
+以后每天启动：
+cd C:\ShopeeLocalStudio\ni
+powershell -ExecutionPolicy Bypass -File .\启动网站.ps1
+
+以后同步更新：
+cd C:\ShopeeLocalStudio\ni
+git pull
+powershell -ExecutionPolicy Bypass -File .\启动网站.ps1
+
+水印/边框素材：
+代码仓库不包含你的本地水印素材。把素材目录放到：
+C:\ShopeeLocalStudio\watermarks\越南水印储存
+
+也可以设置环境变量 SHOPEE_STORE_FRAME_ROOT 指向水印目录。
+
+不会从 GitHub 同步的内容：
+API key、BigSeller 登录缓存、历史任务、生成图片、node_modules。
