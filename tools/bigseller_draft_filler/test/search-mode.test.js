@@ -109,7 +109,7 @@ test("recognizes Item ID search mode", () => {
   assert.equal(isItemIdSearchModeText("SKU ID"), false);
 });
 
-test("source search falls back from SKU to sold-out Item ID", () => {
+test("source search tries active SKU, sold-out SKU, active Item ID, then sold-out Item ID", () => {
   const attempts = buildSourceSearchAttempts({
     skus: ["XL86301"],
     itemIds: ["53765401701"]
@@ -117,6 +117,8 @@ test("source search falls back from SKU to sold-out Item ID", () => {
 
   assert.deepEqual(attempts, [
     { mode: "SKU", values: ["XL86301"], soldOut: false },
+    { mode: "SKU", values: ["XL86301"], soldOut: true },
+    { mode: "Item ID", values: ["53765401701"], soldOut: false },
     { mode: "Item ID", values: ["53765401701"], soldOut: true }
   ]);
 });
@@ -128,6 +130,8 @@ test("numeric source SKU input is also tried as sold-out Item ID", () => {
 
   assert.deepEqual(attempts, [
     { mode: "SKU", values: ["47815413330"], soldOut: false },
+    { mode: "SKU", values: ["47815413330"], soldOut: true },
+    { mode: "Item ID", values: ["47815413330"], soldOut: false },
     { mode: "Item ID", values: ["47815413330"], soldOut: true }
   ]);
 });

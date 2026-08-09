@@ -189,8 +189,14 @@ export function buildSourceSearchAttempts({ skus = [], itemIds = [] } = {}) {
     .map((value) => String(value).trim())
     .filter((value) => /^\d{8,20}$/.test(value)))];
   const attempts = [];
-  if (skuValues.length) attempts.push({ mode: "SKU", values: skuValues, soldOut: false });
-  if (itemIdValues.length) attempts.push({ mode: "Item ID", values: itemIdValues, soldOut: true });
+  if (skuValues.length) {
+    attempts.push({ mode: "SKU", values: skuValues, soldOut: false });
+    attempts.push({ mode: "SKU", values: skuValues, soldOut: true });
+  }
+  if (itemIdValues.length) {
+    attempts.push({ mode: "Item ID", values: itemIdValues, soldOut: false });
+    attempts.push({ mode: "Item ID", values: itemIdValues, soldOut: true });
+  }
   return attempts;
 }
 
