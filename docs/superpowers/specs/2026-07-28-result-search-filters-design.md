@@ -26,7 +26,7 @@ Make generated tasks and current image results easy to find after the workflow p
 ## Non-Goals
 
 - No database migration.
-- No login or boss-facing deployment.
+- No login or external-user deployment.
 - No historical archive search UI.
 - No automatic deletion of old archives.
 

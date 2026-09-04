@@ -14,7 +14,7 @@ The UI will expose a small store-frame status line so it is visible whether the 
 
 ## Boundaries
 
-This step does not copy watermark files into every task and does not add a database. It references the existing local asset folder to avoid duplicate storage. Later deployment for the boss can make the frame root configurable through an admin setting or packaged asset folder.
+This step does not copy watermark files into every task and does not add a database. It references the existing local asset folder to avoid duplicate storage. Later local deployment can make the frame root configurable through an admin setting or packaged asset folder.
 
 ## Testing
 

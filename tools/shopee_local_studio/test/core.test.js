@@ -1204,7 +1204,7 @@ test("buildImageResultSummary includes normalized image review state", () => {
     imageReview: {
       status: "delivered",
       flags: ["layout_similar", "bad_flag"],
-      notes: "sent to boss"
+      notes: "sent to reviewer"
     }
   }, [
     { store: "7", storeLabel: "Store 7", file: "store_7/01.png", url: "/image/1" }
@@ -1213,7 +1213,7 @@ test("buildImageResultSummary includes normalized image review state", () => {
   assert.deepEqual(summary.imageReview, {
     status: "delivered",
     flags: ["layout_similar"],
-    notes: "sent to boss",
+    notes: "sent to reviewer",
     updatedAt: ""
   });
 });
