@@ -8,11 +8,17 @@ let imageResults = [];
 let taskImages = [];
 let archivedTasks = [];
 let apiRuntime = null;
+let batchQueue = null;
 
 const taskForm = document.querySelector("#taskForm");
 const apiConfigForm = document.querySelector("#apiConfigForm");
 const apiBaseUrl = document.querySelector("#apiBaseUrl");
 const apiKey = document.querySelector("#apiKey");
+const apiModel = document.querySelector("#apiModel");
+const apiFallbackBaseUrl = document.querySelector("#apiFallbackBaseUrl");
+const apiFallbackKey = document.querySelector("#apiFallbackKey");
+const apiFallbackModel = document.querySelector("#apiFallbackModel");
+const apiFallbackStatus = document.querySelector("#apiFallbackStatus");
 const apiConfigStatus = document.querySelector("#apiConfigStatus");
 const apiKeyStatus = document.querySelector("#apiKeyStatus");
 const productCodeMapForm = document.querySelector("#productCodeMapForm");
@@ -35,6 +41,17 @@ const showArchivedResults = document.querySelector("#showArchivedResults");
 const imageResultsEl = document.querySelector("#imageResults");
 const taskImageSearch = document.querySelector("#taskImageSearch");
 const archivedTaskList = document.querySelector("#archivedTaskList");
+const liveRefreshState = document.querySelector("#liveRefreshState");
+const batchTaskText = document.querySelector("#batchTaskText");
+const batchQueueStatus = document.querySelector("#batchQueueStatus");
+const batchQueueSummary = document.querySelector("#batchQueueSummary");
+const batchQueueItems = document.querySelector("#batchQueueItems");
+const batchCreateStartBtn = document.querySelector("#batchCreateStartBtn");
+const batchPauseBtn = document.querySelector("#batchPauseBtn");
+const batchResumeBtn = document.querySelector("#batchResumeBtn");
+const batchSkipBtn = document.querySelector("#batchSkipBtn");
+let liveRefreshInFlight = false;
+let batchQueueRefreshInFlight = false;
 
 const taskActionButtonIds = [
   "runAllBtn",
@@ -80,6 +97,10 @@ document.querySelector("#testApiConfigBtn").addEventListener("click", () => load
 document.querySelector("#clearApiConfigBtn").addEventListener("click", clearApiConfig);
 document.querySelector("#parseQuickBtn").addEventListener("click", parseQuickTask);
 document.querySelector("#createRunBtn").addEventListener("click", createAndRunTask);
+batchCreateStartBtn.addEventListener("click", createAndStartBatchQueue);
+batchPauseBtn.addEventListener("click", () => changeBatchQueue("pause", "已请求暂停队列"));
+batchResumeBtn.addEventListener("click", () => changeBatchQueue("resume", "批量队列已继续"));
+batchSkipBtn.addEventListener("click", () => changeBatchQueue("skip-current", "已跳过当前项"));
 document.querySelector("#reloadProductCodeMapBtn").addEventListener("click", loadProductCodeMap);
 document.querySelector("#deleteProductCodeMapBtn").addEventListener("click", deleteProductCodeMap);
 document.querySelector("#reloadImageResultsBtn").addEventListener("click", () => loadImageResults(true));
@@ -141,14 +162,175 @@ productCodeMapForm.addEventListener("submit", async (event) => {
 });
 
 await refreshAll();
-setInterval(async () => {
-  if (selectedTask) {
-    await refreshTasks(selectedTask.id, false);
+setInterval(refreshLiveState, 2000);
+
+async function refreshLiveState() {
+  await Promise.all([
+    refreshSelectedTaskLive(),
+    loadBatchQueue(false)
+  ]);
+}
+
+async function refreshSelectedTaskLive() {
+  if (!selectedTask || liveRefreshInFlight) return;
+  const taskId = selectedTask.id;
+  const previousStatus = selectedTask.status;
+  const previousUpdatedAt = selectedTask.updatedAt;
+  liveRefreshInFlight = true;
+  setLiveRefreshState("refreshing");
+  try {
+    const data = await api(`/api/tasks/${taskId}`);
+    if (!selectedTask || selectedTask.id !== taskId) return;
+    selectedTask = data.task;
+    tasks = tasks.map((task) => task.id === taskId ? data.task : task);
+    renderTaskSelect();
+    renderTaskSummary(selectedTask);
+    renderStoreFrameStatus(selectedTask);
+    await renderPreflight();
+    await renderSourceReview(selectedTask);
     await loadLogs();
-    await loadImages();
-    await loadImageResults(false);
+    if (previousStatus !== selectedTask.status || previousUpdatedAt !== selectedTask.updatedAt) {
+      await loadImages();
+      await loadImageResults(false);
+    }
+    setLiveRefreshState("ready");
+  } catch (error) {
+    setLiveRefreshState("error");
+  } finally {
+    liveRefreshInFlight = false;
   }
-}, 5000);
+}
+
+function setLiveRefreshState(state) {
+  if (!liveRefreshState) return;
+  liveRefreshState.className = `live-refresh-state ${state}`;
+  liveRefreshState.textContent = state === "error"
+    ? "\u25cf \u81ea\u52a8\u5237\u65b0\u6682\u505c"
+    : (state === "refreshing" ? "\u25cf \u6b63\u5728\u5237\u65b0" : "\u25cf \u81ea\u52a8\u5237\u65b0\uff1a2\u79d2");
+}
+
+async function loadBatchQueue(notify = false) {
+  if (batchQueueRefreshInFlight) return;
+  batchQueueRefreshInFlight = true;
+  try {
+    const data = await api("/api/batch-queue");
+    batchQueue = data.queue;
+    renderBatchQueue();
+    if (notify) toast("批量队列已刷新");
+  } catch (error) {
+    if (notify) toast(error.message);
+  } finally {
+    batchQueueRefreshInFlight = false;
+  }
+}
+
+async function createAndStartBatchQueue() {
+  const text = batchTaskText.value.trim();
+  const targetStores = selectedTargetStores();
+  if (!text) {
+    toast("请粘贴商品清单，每行一个 Item ID/SKU");
+    batchTaskText.focus();
+    return;
+  }
+  if (!targetStores.length) {
+    toast("请先勾选至少一个目标店铺");
+    storeChecks.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+  if (batchQueue?.items?.length && !["empty", "done"].includes(batchQueue.status)) {
+    if (!window.confirm("当前批量队列尚未完成，确定用新清单替换它吗？已有商品任务不会被删除。")) return;
+  }
+  batchCreateStartBtn.disabled = true;
+  try {
+    const data = await api("/api/batch-queue", {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+        targetStores,
+        notes: taskForm.elements.notes.value,
+        start: true
+      })
+    });
+    batchQueue = data.queue;
+    renderBatchQueue();
+    toast(`批量队列已开始，共 ${batchQueue.items.length} 个商品`);
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    renderBatchQueue();
+  }
+}
+
+async function changeBatchQueue(action, message) {
+  const button = action === "pause" ? batchPauseBtn : (action === "resume" ? batchResumeBtn : batchSkipBtn);
+  button.disabled = true;
+  try {
+    const data = await api(`/api/batch-queue/${action}`, { method: "POST" });
+    batchQueue = data.queue;
+    renderBatchQueue();
+    toast(message);
+  } catch (error) {
+    toast(error.message);
+    await loadBatchQueue(false);
+  }
+}
+
+function renderBatchQueue() {
+  if (!batchQueue) return;
+  const status = batchQueue.status || "empty";
+  const labels = {
+    interrupted: "已中断，需确认后继续",
+    empty: "未创建",
+    ready: "待开始",
+    running: "运行中",
+    paused: "已暂停",
+    done: "已完成"
+  };
+  batchQueueStatus.className = `batch-status ${escapeHtml(status)}`;
+  batchQueueStatus.textContent = labels[status] || status;
+  const counts = batchQueue.counts || {};
+  batchQueueSummary.innerHTML = batchQueue.items?.length ? `
+    <strong>${escapeHtml(batchQueue.lastMessage || "")}</strong>
+    <span>共 ${Number(counts.total || 0)} 项 · 完成 ${Number(counts.done || 0)} · 等待 ${Number(counts.waiting || 0)} · 需处理 ${Number(counts.failed || 0)} · 跳过 ${Number(counts.skipped || 0)}</span>
+  ` : "尚未创建批量队列。";
+  batchQueueItems.innerHTML = (batchQueue.items || []).map((item) => `
+    <button class="batch-item ${escapeHtml(item.status)}" type="button" data-task-id="${escapeHtml(item.taskId || "")}" ${item.taskId ? "" : "disabled"}>
+      <span class="batch-item-index">${Number(item.index) + 1}</span>
+      <span class="batch-item-main">
+        <strong>${escapeHtml(item.input)}</strong>
+        <small>${escapeHtml(batchItemStatusLabel(item.status))}${item.error ? ` · ${escapeHtml(item.error)}` : ""}</small>
+      </span>
+    </button>
+  `).join("");
+  batchQueueItems.querySelectorAll("[data-task-id]").forEach((button) => {
+    if (!button.dataset.taskId) return;
+    button.addEventListener("click", () => openBatchTask(button.dataset.taskId));
+  });
+  const runnerBusy = Boolean(batchQueue.runnerActive);
+  const active = status === "running" || runnerBusy;
+  batchCreateStartBtn.disabled = active;
+  batchTaskText.disabled = active;
+  batchPauseBtn.disabled = status !== "running";
+  batchResumeBtn.disabled = !["paused", "ready"].includes(status) || runnerBusy;
+  batchSkipBtn.disabled = status !== "paused" || runnerBusy || !batchQueue.items?.some((item) => !["done", "skipped"].includes(item.status));
+}
+
+function batchItemStatusLabel(status) {
+  return ({
+    waiting: "等待中",
+    running: "正在处理",
+    done: "已完成",
+    failed: "失败，队列已暂停",
+    needs_confirmation: "需要人工确认",
+    skipped: "已跳过"
+  })[status] || status;
+}
+
+async function openBatchTask(taskId) {
+  taskSearch.value = "";
+  await refreshTasks(taskId, false);
+  document.querySelector(".work-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
 async function handleImagePaste(event) {
   const files = [...(event.clipboardData?.files || [])].filter((file) => file.type.startsWith("image/"));
@@ -221,6 +403,11 @@ function quickTaskInputText() {
 
 async function createTaskFromForm(runAll) {
   const payload = readTaskForm();
+  if (payload.targetStores.length === 0) {
+    toast("请先勾选至少一个目标店铺");
+    storeChecks.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   const data = await api("/api/tasks", { method: "POST", body: JSON.stringify(payload) });
   selectedTask = data.task;
   pendingParsedTask = null;
@@ -244,7 +431,7 @@ function readTaskForm() {
 }
 
 function selectedTargetStores() {
-  return [...taskForm.querySelectorAll("input[name=targetStores]:checked")].map((input) => input.value);
+  return [...storeChecks.querySelectorAll("input[name=targetStores]:checked")].map((input) => input.value);
 }
 
 function fillTaskForm(task) {
@@ -267,6 +454,7 @@ async function refreshAll() {
   productCodeMappings = mapData.mappings || [];
   renderStores();
   renderProductCodeMap();
+  await loadBatchQueue(false);
   await refreshTasks(selectedTask?.id ?? (pendingParsedTask ? null : undefined));
   await loadArchivedTasks(false);
   await loadImageResults(false);
@@ -275,7 +463,7 @@ async function refreshAll() {
 async function loadApiConfig(notify = false) {
   const data = await api("/api/runtime-config").catch((error) => ({
     config: { baseUrl: "", apiKeySet: false, maskedApiKey: "" },
-    runtime: { apiKeySet: false, baseUrl: "", invalidBaseUrl: true },
+    runtime: { apiKeySet: false, baseUrl: "", configLoadError: true },
     error: error.message
   }));
   apiRuntime = data.runtime || null;
@@ -288,7 +476,11 @@ async function saveApiConfig(event) {
   event.preventDefault();
   const payload = {
     baseUrl: apiBaseUrl.value.trim(),
-    apiKey: apiKey.value.trim()
+    apiKey: apiKey.value.trim(),
+    model: apiModel.value.trim(),
+    fallbackBaseUrl: apiFallbackBaseUrl.value.trim(),
+    fallbackApiKey: apiFallbackKey.value.trim(),
+    fallbackModel: apiFallbackModel.value.trim()
   };
   try {
     const data = await api("/api/runtime-config", {
@@ -296,6 +488,7 @@ async function saveApiConfig(event) {
       body: JSON.stringify(payload)
     });
     apiKey.value = "";
+    apiFallbackKey.value = "";
     apiRuntime = data.runtime || null;
     renderApiConfig(data);
     if (selectedTask) await renderPreflight();
@@ -309,6 +502,7 @@ async function clearApiConfig() {
   if (!window.confirm("\u786e\u5b9a\u6e05\u9664\u672c\u673a API \u914d\u7f6e\uff1f")) return;
   const data = await api("/api/runtime-config", { method: "DELETE" });
   apiKey.value = "";
+  apiFallbackKey.value = "";
   apiRuntime = data.runtime || null;
   renderApiConfig(data);
   if (selectedTask) await renderPreflight();
@@ -319,6 +513,9 @@ function renderApiConfig(data) {
   const config = data.config || {};
   const runtime = data.runtime || {};
   if (config.baseUrl) apiBaseUrl.value = config.baseUrl;
+  apiModel.value = config.model || "gpt-image-2.5";
+  apiFallbackBaseUrl.value = config.fallbackBaseUrl || "";
+  apiFallbackModel.value = config.fallbackModel || config.model || "gpt-image-2.5";
   const state = apiConfigState(runtime);
   apiConfigStatus.className = `api-config-status ${state.className}`;
   apiConfigStatus.innerHTML = `
@@ -332,9 +529,23 @@ function renderApiConfig(data) {
       ? `\u5df2\u4fdd\u5b58\u5bc6\u94a5\uff1a${config.maskedApiKey || "****"}`
       : "\u672a\u4fdd\u5b58 API \u5bc6\u94a5\uff0c\u751f\u56fe\u524d\u9700\u8981\u5148\u586b\u5199\u3002";
   }
+  if (apiFallbackStatus) {
+    apiFallbackStatus.textContent = config.fallbackEnabled
+      ? (config.fallbackApiKeySet
+        ? `备用线路已启用：${config.fallbackBaseUrl} · ${config.fallbackModel}`
+        : "备用中转站缺少 API 密钥，暂不会参与自动切换。")
+      : "未启用备用中转站。";
+  }
 }
 
 function apiConfigState(runtime = {}) {
+  if (runtime.configLoadError) {
+    return {
+      className: "blocked",
+      label: "无法读取 API 配置",
+      message: "请确认本机网站已启动，然后刷新页面重试"
+    };
+  }
   if (runtime.invalidBaseUrl) {
     return {
       className: "blocked",
@@ -365,8 +576,8 @@ function apiConfigState(runtime = {}) {
   }
   return {
     className: "ready",
-    label: "API \u914d\u7f6e\u53ef\u7528",
-    message: runtime.baseUrl || "\u5df2\u914d\u7f6e\u751f\u56fe\u63a5\u53e3"
+    label: runtime.failoverEnabled ? "主备中转配置已保存" : "API 配置已保存",
+    message: `${runtime.baseUrl || "已配置生图接口"} · ${runtime.model || "gpt-image-2.5"}（未验证实际生图上游）`
   };
 }
 
@@ -414,7 +625,7 @@ function taskListUrl() {
 function renderStores() {
   storeChecks.innerHTML = stores.map((store) => `
     <label class="store-check">
-      <input type="checkbox" name="targetStores" value="${store.id}" checked>
+      <input type="checkbox" name="targetStores" value="${store.id}" ${store.defaultSelected === false ? "" : "checked"}>
       ${escapeHtml(store.label)}
     </label>
   `).join("");
@@ -576,10 +787,7 @@ async function renderTask() {
     return;
   }
 
-  document.querySelector("#taskProduct").textContent = displayTask.productName;
-  document.querySelector("#taskSkus").textContent = taskIdentifierText(displayTask);
-  document.querySelector("#taskStatus").textContent = displayTask.status;
-  document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
+  renderTaskSummary(displayTask);
   document.querySelector("#archiveBtn").textContent = displayTask.archived ? "\u53d6\u6d88\u5f52\u6863" : "\u5f52\u6863\u4efb\u52a1";
   renderStoreFrameStatus(displayTask);
   await renderPreflight();
@@ -593,6 +801,60 @@ async function renderTask() {
     imageGrid.innerHTML = '<div class="empty">\u521b\u5efa\u4efb\u52a1\u540e\u751f\u6210\u56fe\u7247</div>';
     logs.textContent = "\u5df2\u89e3\u6790\u5230\u5de6\u4fa7\u8868\u5355\u3002\u8bf7\u70b9\u51fb\u201c\u521b\u5efa\u5e76\u4e00\u952e\u5168\u6d41\u7a0b\u201d\uff0c\u624d\u4f1a\u771f\u6b63\u751f\u6210\u56fe\u7247\u5e76\u5904\u7406 BigSeller \u8349\u7a3f\u3002";
   }
+}
+
+function renderTaskSummary(displayTask) {
+  document.querySelector("#taskProduct").textContent = displayTask.productName;
+  document.querySelector("#taskSkus").textContent = taskIdentifierText(displayTask);
+  const taskStatus = document.querySelector("#taskStatus");
+  taskStatus.textContent = taskStatusLabel(displayTask.status);
+  taskStatus.className = `task-status ${taskStatusTone(displayTask.status)}`;
+  document.querySelector("#taskArchived").textContent = selectedTask ? (displayTask.archived ? "\u5df2\u5f52\u6863" : "\u6d3b\u8dc3") : "\u672a\u521b\u5efa";
+}
+
+function taskStatusLabel(status) {
+  const labels = {
+    created: "\u5df2\u521b\u5efa",
+    fetching_source_images: "\u6b63\u5728\u68c0\u7d22 1\u5e97\u6765\u6e90",
+    source_config_ready: "\u5df2\u51c6\u5907\uff0c\u7b49\u5f85\u5f00\u59cb",
+    source_review_required: "\u7b49\u5f85\u786e\u8ba4\u6765\u6e90",
+    source_lookup_failed: "\u6765\u6e90\u68c0\u7d22\u5931\u8d25",
+    source_confirmed: "\u6765\u6e90\u5df2\u786e\u8ba4",
+    source_auto_confirmed: "\u6765\u6e90\u5df2\u81ea\u52a8\u786e\u8ba4",
+    source_rejected: "\u6765\u6e90\u4e0d\u5339\u914d",
+    image2_config_ready: "\u751f\u56fe\u914d\u7f6e\u5df2\u51c6\u5907",
+    bigseller_config_ready: "BigSeller \u914d\u7f6e\u5df2\u51c6\u5907",
+    bigseller_copy_config_ready: "\u590d\u5236\u8349\u7a3f\u5df2\u51c6\u5907",
+    listings_updated: "\u6587\u6848\u5df2\u66f4\u65b0",
+    listings_regenerated: "\u6587\u6848\u5df2\u91cd\u65b0\u751f\u6210",
+    generating_images: "\u6b63\u5728\u751f\u6210\u56fe\u7247",
+    regenerating_images: "\u6b63\u5728\u91cd\u65b0\u751f\u56fe",
+    discovering_bigseller_drafts: "\u6b63\u5728\u67e5\u627e BigSeller \u8349\u7a3f",
+    copying_source_to_bigseller_drafts: "\u6b63\u5728\u590d\u5236\u8349\u7a3f",
+    saving_bigseller_drafts: "\u6b63\u5728\u4fdd\u5b58 BigSeller \u8349\u7a3f",
+    pipeline_queued: "\u5df2\u8fdb\u5165\u5904\u7406\u961f\u5217",
+    pipeline_copying_source_to_bigseller_drafts: "\u6b63\u5728\u590d\u5236\u8349\u7a3f",
+    pipeline_generating_images: "\u6b63\u5728\u751f\u6210\u56fe\u7247",
+    pipeline_discovering_bigseller_drafts: "\u6b63\u5728\u67e5\u627e BigSeller \u8349\u7a3f",
+    pipeline_saving_bigseller_drafts: "\u6b63\u5728\u4fdd\u5b58 BigSeller \u8349\u7a3f",
+    pipeline_done: "\u5168\u6d41\u7a0b\u5df2\u5b8c\u6210",
+    pipeline_failed: "\u5168\u6d41\u7a0b\u5931\u8d25",
+    preflight_blocked: "\u68c0\u67e5\u672a\u901a\u8fc7",
+    image2_preflight_failed: "\u751f\u56fe\u68c0\u67e5\u5931\u8d25"
+  };
+  const value = String(status || "");
+  if (labels[value]) return labels[value];
+  if (value.endsWith("_done")) return "\u6b65\u9aa4\u5df2\u5b8c\u6210";
+  if (value.endsWith("_failed")) return "\u6267\u884c\u5931\u8d25";
+  return value ? value.replaceAll("_", " ") : "\u672a\u77e5";
+}
+
+function taskStatusTone(status) {
+  const value = String(status || "");
+  if (/failed|blocked|rejected|interrupted/.test(value)) return "error";
+  if (/queued|fetching|generating|copying|discovering|saving/.test(value)) return "running";
+  if (/done|confirmed|updated|ready/.test(value)) return "ready";
+  return "neutral";
 }
 
 async function renderPreflight() {
@@ -687,7 +949,7 @@ function renderPipelineProgress(progress) {
       <div class="pipeline-next-action ${escapeHtml(visibleStatus.level)}">
         <span>\u4e0b\u4e00\u6b65</span>
         <strong>${escapeHtml(visibleStatus.nextAction)}</strong>
-        ${visibleStatus.level === "error" ? '<em>\u4fee\u590d\u65e5\u5fd7\u4e2d\u7684\u9519\u8bef\u540e\uff0c\u70b9\u201c\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u201d\u91cd\u8bd5\u3002</em>' : ""}
+        ${visibleStatus.level === "error" && !progress?.timing?.interrupted ? '<em>\u4fee\u590d\u65e5\u5fd7\u4e2d\u7684\u9519\u8bef\u540e\uff0c\u70b9\u201c\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u201d\u91cd\u8bd5\u3002</em>' : ""}
       </div>
       ${progress.stage === "done" ? '<div class="pipeline-done-banner">\u5df2\u4fdd\u5b58\u5230 BigSeller \u8349\u7a3f\u7bb1</div>' : ""}
     </div>
@@ -696,21 +958,17 @@ function renderPipelineProgress(progress) {
 
 function isPipelineRunning(taskOrProgress = selectedTask) {
   const status = String(taskOrProgress?.status || taskOrProgress?.stage || "");
-  const level = String(taskOrProgress?.level || "");
-  return level === "running" || [
+  return [
     "pipeline_queued",
+    "pipeline_waiting_image_api",
     "fetching_source_images",
-    "source_config_ready",
     "pipeline_copying_source_to_bigseller_drafts",
     "copying_source_to_bigseller_drafts",
-    "bigseller_copy_config_ready",
     "pipeline_generating_images",
     "generating_images",
     "regenerating_images",
-    "image2_config_ready",
     "pipeline_discovering_bigseller_drafts",
     "discovering_bigseller_drafts",
-    "bigseller_config_ready",
     "pipeline_saving_bigseller_drafts",
     "saving_bigseller_drafts"
   ].includes(status);
@@ -722,7 +980,7 @@ function setPrimaryPipelineButtonState(progress = null) {
   const createRunBtn = document.querySelector("#createRunBtn");
   if (runAllBtn) {
     runAllBtn.disabled = !selectedTask || running;
-    runAllBtn.textContent = running ? "\u6d41\u7a0b\u8fd0\u884c\u4e2d" : "\u4e00\u952e\u5f00\u59cb\u5168\u6d41\u7a0b";
+    runAllBtn.textContent = running ? "\u6d41\u7a0b\u8fd0\u884c\u4e2d" : pipelineActionLabel(selectedTask);
   }
   if (createRunBtn) {
     createRunBtn.disabled = isPipelineRunning(selectedTask);
@@ -730,20 +988,31 @@ function setPrimaryPipelineButtonState(progress = null) {
   }
 }
 
+function pipelineActionLabel(task) {
+  const status = String(task?.status || "");
+  if (status === "pipeline_done") return "\u6d41\u7a0b\u5df2\u5b8c\u6210";
+  const hasProgress = Boolean(task?.pipelineTiming?.startedAt)
+    || (Array.isArray(task?.sourceImages) && task.sourceImages.length > 0)
+    || !["", "created", "source_config_ready"].includes(status);
+  return hasProgress ? "\u4e00\u952e\u7ee7\u7eed\u5168\u6d41\u7a0b" : "\u4e00\u952e\u5f00\u59cb\u5168\u6d41\u7a0b";
+}
+
 function pipelineStepDefinitions() {
   return [
     { id: "source_lookup", label: "1\u5e97\u68c0\u7d22", hint: "\u6309 Item ID/SKU \u627e\u6e90\u5546\u54c1" },
     { id: "source_review", label: "\u6765\u6e90\u786e\u8ba4", hint: "\u4eba\u5de5\u786e\u8ba4\u5546\u54c1\u662f\u540c\u4e00\u6b3e" },
-    { id: "bigseller_copy", label: "\u590d\u5236\u8349\u7a3f", hint: "\u590d\u5236 1 \u5e97\u5230 4-9 \u5e97" },
+    { id: "bigseller_copy", label: "\u590d\u5236\u8349\u7a3f", hint: "\u590d\u5236 1 \u5e97\u5230\u5df2\u9009\u76ee\u6807\u5e97\u94fa" },
     { id: "image_generation", label: "\u751f\u6210\u56fe\u7247", hint: "\u6309\u5404\u5e97\u98ce\u683c\u751f\u6210\u56fe" },
-    { id: "bigseller_discover", label: "\u67e5\u627e\u8349\u7a3f", hint: "\u5339\u914d 4-9 \u5e97\u8349\u7a3f\u94fe\u63a5" },
+    { id: "bigseller_discover", label: "\u67e5\u627e\u8349\u7a3f", hint: "\u5339\u914d\u5df2\u9009\u76ee\u6807\u5e97\u94fa\u8349\u7a3f\u94fe\u63a5" },
     { id: "bigseller_save", label: "\u4fdd\u5b58\u8349\u7a3f", hint: "\u4e0a\u4f20\u56fe\u7247\u5e76\u70b9\u767d\u8272\u4fdd\u5b58" },
     { id: "done", label: "\u5b8c\u6210", hint: "\u5230\u7ed3\u679c\u5e93\u68c0\u67e5\u56fe\u7247" }
   ];
 }
 
 function pipelineSteps(progress) {
-  const steps = pipelineStepDefinitions();
+  const steps = progress?.timing?.scope === "images_only"
+    ? pipelineStepDefinitions().filter((step) => step.id === "image_generation")
+    : pipelineStepDefinitions();
   const currentIndex = steps.findIndex((step) => step.id === progress?.stage);
   if (progress?.stage === "done") return steps.map((step) => ({ ...step, state: "done" }));
   return steps.map((step, index) => {
@@ -762,6 +1031,7 @@ function pipelineStepDisplayState(step, progress, index, currentIndex, steps = p
     if (timing?.stages?.[step.id]?.finishedAt) return "done";
     return "todo";
   }
+  if (index === currentIndex && progress?.level === "running") return "active";
   if (timing?.stages?.[step.id]?.finishedAt) return "done";
   if (index < currentIndex) return "done";
   if (index === currentIndex) return "active";
@@ -771,6 +1041,10 @@ function pipelineStepDisplayState(step, progress, index, currentIndex, steps = p
 function pipelineVisibleStatus(progress = {}) {
   const hasError = progress?.level === "error" || progress?.stage === "failed" || progress?.stage === "blocked";
   if (hasError) {
+    if (progress?.timing?.interrupted) return {
+      level: "error", stageLabel: "已中断", label: "流程已中断",
+      message: progress.message, nextAction: progress.nextAction
+    };
     const failedStage = pipelineFailedStage(progress?.timing);
     const failedLabel = pipelineStepLabel(failedStage);
     const message = [
@@ -821,18 +1095,21 @@ function pipelineMetrics(progress) {
   const activeTiming = timing.stages?.[activeStage];
   return {
     total: formatPipelineDuration(timing.startedAt, timing.finishedAt),
-    current: activeTiming ? formatPipelineDuration(activeTiming.startedAt, activeTiming.finishedAt) : "\u672a\u5f00\u59cb"
+    current: progress?.stage === 'done' ? '已完成' : progress?.level === "error"
+      ? "\u5df2\u505c\u6b62"
+      : (activeTiming ? formatPipelineDuration(activeTiming.startedAt, activeTiming.finishedAt) : "\u672a\u5f00\u59cb")
   };
 }
 
 function formatPipelineStepDuration(step, timing = {}) {
+  if (step.id === 'done' && step.state === 'done') return '已完成';
   const stageTiming = timing?.stages?.[step.id];
   if (!stageTiming?.startedAt) {
     if (step.state === "done") return "\u5df2\u5b8c\u6210";
     if (step.state === "todo") return "\u5f85\u5904\u7406";
     return "\u6682\u65e0\u8bb0\u5f55";
   }
-  return formatPipelineDuration(stageTiming.startedAt, stageTiming.finishedAt);
+  return formatPipelineDuration(stageTiming.startedAt, stageTiming.finishedAt || timing.finishedAt);
 }
 
 function formatPipelineDuration(startedAt, finishedAt) {
@@ -1022,7 +1299,8 @@ function renderStoreFrameStatus(displayTask) {
 }
 
 function renderListings(displayTask = selectedTask) {
-  listingEditors.innerHTML = displayTask.targetStores.map((storeId) => {
+  const auditWarnings = displayTask.listingAudit?.warnings || [];
+  listingEditors.innerHTML = (auditWarnings.length ? `<div class="listing-audit-warning">${auditWarnings.map(escapeHtml).join('<br>')}</div>` : '') + displayTask.targetStores.map((storeId) => {
     const store = stores.find((item) => item.id === storeId);
     const listing = displayTask.listings?.[storeId] || { title: "", detail: "" };
     const titleCount = titleLength(listing.title);
@@ -1033,7 +1311,7 @@ function renderListings(displayTask = selectedTask) {
           &#26631;&#39064;
           <textarea data-field="title" rows="3">${escapeHtml(listing.title)}</textarea>
         </label>
-        <div class="count ${titleCount < 90 || titleCount > 99 ? "bad" : ""}">${titleCount}/99</div>
+        <div class="count ${titleCount < 90 || titleCount > 100 ? "bad" : ""}">${titleCount}/100（须为 90–100 字符）</div>
         <label>
           &#35814;&#24773;
           <textarea data-field="detail" rows="9">${escapeHtml(listing.detail)}</textarea>
@@ -1046,14 +1324,14 @@ function renderListings(displayTask = selectedTask) {
     textarea.addEventListener("input", () => {
       const count = textarea.closest(".listing-editor").querySelector(".count");
       const titleCount = titleLength(textarea.value);
-      count.textContent = `${titleCount}/99`;
-      count.classList.toggle("bad", titleCount < 90 || titleCount > 99);
+      count.textContent = `${titleCount}/100（须为 90–100 字符）`;
+      count.classList.toggle("bad", titleCount < 90 || titleCount > 100);
     });
   });
 }
 
 function titleLength(value) {
-  return Array.from(String(value || "")).length;
+  return Array.from(String(value || "").normalize("NFC")).length;
 }
 
 async function saveListings() {
@@ -1195,6 +1473,9 @@ async function loadImages() {
   if (!selectedTask) return;
   const data = await api(`/api/tasks/${selectedTask.id}/images`);
   taskImages = data.images || [];
+  const progressPanel = document.querySelector('#imageSlotProgress');
+  const labels = { done: '已完成', active: '生成中', interrupted: '已中断', blocked: '失败待处理', retry: '待重试', pending: '待生成' };
+  if (progressPanel) progressPanel.innerHTML = (data.progress || []).map(store => `<div class="image-slot-row"><strong>${escapeHtml(store.label)} · ${store.slots.filter(slot => slot.state === 'done').length}/4</strong><span>${store.slots.map((slot, i) => `${i + 1}：${labels[slot.state] || '待生成'}${slot.attempts ? `（已请求${slot.attempts}次）` : ''}`).join('　')}</span></div>`).join('');
   renderTaskImages();
 }
 

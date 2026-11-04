@@ -2,8 +2,9 @@
 import fs from "node:fs/promises";
 import { runAdaptivePool } from "./adaptive-pool.js";
 import { normalizeConfig } from "./config.js";
-import { callImageApi, isRetryableImageError } from "./image2-client.js";
+import { callImageApi, isFatalImageError, isRetryableImageError } from "./image2-client.js";
 import { shouldSkipJobOutput } from "./jobs.js";
+import { openQueueCheckpoint } from "./queue-checkpoint.js";
 import { fitPngToSquare, writeImage } from "./postprocess.js";
 
 async function main() {
@@ -29,37 +30,68 @@ async function main() {
     throw new Error("Missing OPENAI_API_KEY. Set it in environment or pass --api-key.");
   }
 
-  const result = await runAdaptivePool(config.jobs, {
-    maxConcurrency: config.concurrency,
-    fallbackConcurrency: Math.min(2, config.concurrency),
-    isRetryable: isRetryableImageError,
-    continueOnError: true,
-    maxRetryableFailures: config.maxRetryableFailures,
-    onDowngrade: ({ from, to, error }) => {
-      console.warn(`[image2] concurrency reduced ${from} -> ${to}: ${error.message}`);
-    },
-    onRequeue: ({ item }) => {
-      console.warn(`[image2] requeue ${item.name} at reduced concurrency`);
-    },
-    onFailure: ({ item, error }) => {
-      console.error(`[image2] failed ${item.name}: ${error.message}`);
-    }
-  }, async (job) => {
+  // Exclude completed outputs before dispatch: a skipped file is not proof that
+  // the upstream recovered and must not reset the consecutive-failure circuit.
+  const pending = [];
+  for (const job of config.jobs) {
     if (await shouldSkipJobOutput(job.outputPath, undefined, { overwrite: args.overwrite })) {
       console.log(`[skip] ${job.outputPath}`);
-      return;
-    }
-    if (args.overwrite) {
-      console.log(`[overwrite] ${job.outputPath}`);
-    }
-    console.log(`[image2] ${job.name} -> ${job.outputPath}`);
-    const bytes = await callImageApi({ config, job, apiKey });
-    await writeImage(bytes, job.outputPath);
-    await fitPngToSquare(job.outputPath, config.outputSize);
-    console.log(`[done] ${job.outputPath}`);
+    } else pending.push(job);
+  }
+  if (pending.length === 0) return;
+  const checkpoint = await openQueueCheckpoint(pending, {
+    filePath: config.queueStatePath, sessionId: config.queueSessionId,
+    maxAttempts: config.maxJobAttempts
   });
+  const eligibleJobs = () => checkpoint.orderedJobs().filter(checkpoint.eligible);
+  const exhausted = () => new Error("IMAGE_QUEUE_EXHAUSTED: no eligible image jobs remain in this run; attempt budget reached or jobs blocked. Existing images preserved. Check request diagnostics before manually continuing.");
+  if (eligibleJobs().length === 0) throw exhausted();
+  console.log(`[image queue] ${pending.length} missing; ${eligibleJobs().length} eligible; maximum ${config.maxJobAttempts} attempts per image in this run.`);
+  let result;
+  try {
+    result = await runAdaptivePool(eligibleJobs(), {
+      maxConcurrency: config.concurrency,
+      fallbackConcurrency: Math.min(2, config.concurrency),
+      isRetryable: isRetryableImageError,
+      isFatal: isFatalImageError,
+      continueOnError: true,
+      maxRetryableFailures: config.maxRetryableFailures,
+      onDowngrade: ({ from, to, error }) => {
+        console.warn(`[image2] concurrency reduced ${from} -> ${to}: ${error.message}`);
+      },
+      onRequeue: ({ item }) => {
+        console.warn(`[image2] move ${item.name} to queue tail after transient failure`);
+      },
+      onFailure: ({ item, error }) => {
+        console.error(`[image2] failed ${item.name}: ${error.message}`);
+      }
+    }, async (job) => {
+      await checkpoint.start(job);
+      try {
+        if (args.overwrite) console.log(`[overwrite] ${job.outputPath}`);
+        console.log(`[image2] ${job.name} -> ${job.outputPath}`);
+        const bytes = await callImageApi({
+          config, job, apiKey,
+          maxAttempts: config.requestMaxAttempts,
+          timeoutMs: config.requestTimeoutMs,
+          onDiagnostic: (event) => console.log(`[image timing] ${job.name} ${JSON.stringify(event)}`)
+        });
+        await writeImage(bytes, job.outputPath);
+        await fitPngToSquare(job.outputPath, config.outputSize);
+        await checkpoint.complete(job);
+        console.log(`[done] ${job.outputPath}`);
+      } catch (error) {
+        await checkpoint.fail(job, error, isRetryableImageError(error));
+        throw error;
+      }
+    });
+  } catch (error) {
+    if (isRetryableImageError(error) && eligibleJobs().length === 0) throw exhausted();
+    throw error;
+  }
 
   if (result.failures.length > 0) {
+    if (eligibleJobs().length === 0) throw exhausted();
     const names = result.failures.map(({ item }) => item.name).join(", ");
     throw new Error(`${result.failures.length} image job(s) failed after retries: ${names}`);
   }
@@ -89,6 +121,8 @@ function printPlan(config) {
     outputSize: config.outputSize,
     concurrency: config.concurrency,
     maxRetryableFailures: config.maxRetryableFailures,
+    requestMaxAttempts: config.requestMaxAttempts,
+    requestTimeoutMs: config.requestTimeoutMs,
     overwrite: Boolean(config.overwrite),
     jobs: config.jobs.map((job) => ({
       name: job.name,
@@ -119,5 +153,7 @@ Options:
 
 main().catch((error) => {
   console.error(`[error] ${error.stack || error.message}`);
-  process.exit(1);
+  // Drain diagnostic/checkpoint writes and HTTP handles before exiting. A forced
+  // exit during async cleanup can hit libuv's UV_HANDLE_CLOSING assertion on Windows.
+  process.exitCode = 1;
 });

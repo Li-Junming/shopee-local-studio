@@ -2,17 +2,52 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  bigSellerUploadBlockReason,
   buildCopyDraftPlan,
   buildSourceSearchAttempts,
   chooseStatusTabControl,
   chooseCopyToDraftControl,
   chooseSearchModeOption,
   chooseSearchModeTrigger,
+  fallbackSearchModeTriggerBox,
   isItemIdSearchModeText,
+  isNonRetryableBigSellerError,
   isSkuSearchModeText,
   normalizeSourceRowText,
+  pendingSaveJobs,
+  resolveEditUrlCandidate,
   rowMatchesSkuAndStore
 } from "../src/fill-drafts.js";
+
+test("reports BigSeller material-center quota failures immediately", () => {
+  assert.equal(
+    bigSellerUploadBlockReason({ code: -1, msg: "可用素材中心空间不足，请清理素材" }),
+    "可用素材中心空间不足，请清理素材"
+  );
+  assert.equal(
+    bigSellerUploadBlockReason({ code: 0, data: { hasImageSpace: 0, usedSizeStr: 800.51, allowSizeStr: 800 } }),
+    "BigSeller 素材中心空间不足（已用 800.51 MB / 额度 800 MB）"
+  );
+  assert.equal(bigSellerUploadBlockReason({ code: 0, data: { hasImageSpace: 1 } }), "");
+  assert.equal(isNonRetryableBigSellerError(new Error("BigSeller blocked image upload: 素材中心空间不足")), true);
+  assert.equal(isNonRetryableBigSellerError(new Error("temporary timeout")), false);
+});
+
+test("save resume skips jobs already recorded in the checkpoint", () => {
+  const jobs = [
+    { name: "store 4", editUrl: "https://example.test/edit/4" },
+    { name: "store 5", editUrl: "https://example.test/edit/5" },
+    { name: "store 6", editUrl: "https://example.test/edit/6" }
+  ];
+  const progress = {
+    completedJobs: [
+      { key: "https://example.test/edit/4" },
+      "https://example.test/edit/6"
+    ]
+  };
+
+  assert.deepEqual(pendingSaveJobs(jobs, progress), [jobs[1]]);
+});
 
 test("normalizes source row text for source match evidence", () => {
   const text = normalizeSourceRowText("  Store 1\nSKU: YSLD80501\tLancome   Serum  ".repeat(8));
@@ -67,9 +102,46 @@ test("chooses the real Chinese product-name dropdown immediately left of the sea
   assert.deepEqual(chooseSearchModeTrigger(inputBox, candidates), candidates[0]);
 });
 
+test("chooses a product-name dropdown decorated with BigSeller icon-font text", () => {
+  const inputBox = { x: 161, y: 22, width: 359, height: 32 };
+  const candidates = [
+    { index: 4, text: "产品名称 \uE6DF", box: { x: 62, y: 22, width: 99, height: 32 } },
+    { index: 18, text: "模糊搜索", box: { x: 525, y: 22, width: 70, height: 32 } }
+  ];
+
+  assert.deepEqual(chooseSearchModeTrigger(inputBox, candidates), candidates[0]);
+});
+
+test("uses the area immediately left of the input when BigSeller hides the dropdown text", () => {
+  assert.deepEqual(
+    fallbackSearchModeTriggerBox({ x: 161, y: 22, width: 359, height: 32 }),
+    { x: 60.48, y: 22, width: 100.52, height: 32 }
+  );
+  assert.deepEqual(
+    fallbackSearchModeTriggerBox({ x: 570, y: 516, width: 433, height: 39 }),
+    { x: 448.76, y: 516, width: 121.24, height: 39 }
+  );
+});
+
+test("accepts only valid BigSeller edit URLs", () => {
+  const baseUrl = "https://www.bigseller.com/web/listing/shopee/active";
+  assert.equal(
+    resolveEditUrlCandidate("/web/listing/shopee/edit/123", baseUrl),
+    "https://www.bigseller.com/web/listing/shopee/edit/123"
+  );
+  assert.equal(
+    resolveEditUrlCandidate("https://www.bigseller.pro/web/listing/shopee/active/edit/1025545137.htm?bsStatus=4", baseUrl),
+    "https://www.bigseller.pro/web/listing/shopee/active/edit/1025545137.htm?bsStatus=4"
+  );
+  assert.equal(resolveEditUrlCandidate("", baseUrl), "");
+  assert.equal(resolveEditUrlCandidate("javascript:void(0)", baseUrl), "");
+  assert.equal(resolveEditUrlCandidate("/web/listing/shopee/active", baseUrl), "");
+});
+
 test("recognizes SKU search mode exactly", () => {
   assert.equal(isSkuSearchModeText("SKU"), true);
   assert.equal(isSkuSearchModeText(" sku "), true);
+  assert.equal(isSkuSearchModeText("SKU \uE6DF"), true);
   assert.equal(isSkuSearchModeText("SKU ID"), false);
   assert.equal(isSkuSearchModeText("产品名称"), false);
 });

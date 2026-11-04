@@ -1,5 +1,12 @@
 import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { createHash } from 'node:crypto';
+
+export async function fingerprintAssets(assets, { skipImages = false } = {}) {
+  const hash = createHash('sha256').update(JSON.stringify({ title: assets.title, detail: assets.detail, skipImages }));
+  if (!skipImages) for (const image of assets.images) { hash.update(path.basename(image)); hash.update(await readFile(image)); }
+  return hash.digest('hex');
+}
 
 async function requireFile(filePath, label) {
   try {

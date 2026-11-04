@@ -11,15 +11,30 @@ test("normalizes defaults and resolves job output paths", () => {
     ]
   }, "C:/work/jobs.json"));
 
-  assert.equal(config.model, "gpt-image-2");
+  assert.equal(config.model, "gpt-image-2.5");
   assert.equal(config.baseUrl, "https://api.openai.com/v1");
   assert.equal(config.size, "1024x1024");
   assert.equal(config.outputSize, 800);
   assert.equal(config.concurrency, 2);
-  assert.equal(config.maxRetryableFailures, 3);
+  assert.equal(config.maxRetryableFailures, 2);
+  assert.equal(config.requestMaxAttempts, 1);
+  assert.equal(config.requestTimeoutMs, 180000);
+  assert.equal(config.maxJobAttempts, 2);
+  assert.match(config.queueStatePath, /jobs\.json\.queue-state\.json$/);
   assert.equal(config.jobs[0].endpoint, "generations");
   assert.equal(config.jobs[1].endpoint, "edits");
   assert.match(config.jobs[0].outputPath, /outputs[\\/]demo[\\/]store_7[\\/]01_main\.png$/);
+});
+
+test("queue session and attempt budget are explicit and validated", () => {
+  const config = withoutOpenAiBaseUrl(() => normalizeConfig({
+    queueSessionId: "pipeline-start", maxJobAttempts: 3, queueStatePath: "state/queue.json",
+    jobs: [{ prompt: "x", out: "a.png" }]
+  }, "C:/work/jobs.json"));
+  assert.equal(config.queueSessionId, "pipeline-start");
+  assert.equal(config.maxJobAttempts, 3);
+  assert.match(config.queueStatePath, /state[\\/]queue\.json$/);
+  assert.throws(() => normalizeConfig({ jobs: [{ prompt: "x", out: "a.png" }], maxJobAttempts: 0 }), /maxJobAttempts/);
 });
 
 test("rejects jobs without prompts or output filenames", () => {

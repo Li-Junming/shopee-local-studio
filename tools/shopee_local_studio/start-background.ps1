@@ -1,4 +1,4 @@
-param(
+﻿param(
   [int]$Port = 3777,
   [string]$HostName = "127.0.0.1",
   [switch]$Restart
@@ -6,6 +6,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path (Split-Path -Parent $root) "node-runtime.ps1")
+$nodeExecutable = Resolve-StudioNode
+Set-StudioNodeEnvironment -NodePath $nodeExecutable
 
 function Import-SavedEnv {
   if (-not $env:OPENAI_API_KEY) {
@@ -37,7 +40,7 @@ function Stop-PortNode {
 
 function Wait-Health {
   param([string]$Url)
-  for ($i = 0; $i -lt 20; $i++) {
+  for ($i = 0; $i -lt 90; $i++) {
     try {
       $response = Invoke-RestMethod -Uri $Url -TimeoutSec 2
       if ($response.ok) { return $true }
@@ -50,6 +53,8 @@ function Wait-Health {
 }
 
 Import-SavedEnv
+$stopFile = Join-Path $root "data\service\stop-$Port"
+Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
 if (-not $env:OPENAI_API_KEY) {
   Write-Output "OPENAI_API_KEY is not set. Open the Studio and save API config in the left panel."
 }
@@ -67,15 +72,27 @@ if ($existing) {
   exit 0
 }
 
+# An existing supervisor restarts its child after -Restart kills the website.
+# Do not launch a second supervisor for the same port.
+$supervisor = $null
+try { $supervisor = [System.Threading.Mutex]::OpenExisting("Local\ShopeeLocalStudio-$Port") } catch [System.Threading.WaitHandleCannotBeOpenedException] {}
+if ($supervisor) {
+  $supervisor.Dispose()
+  if (-not (Wait-Health -Url "http://${HostName}:$Port/api/health")) { throw 'Website supervisor exists, but recovery health check failed. See data/service logs.' }
+  Write-Output "Website recovered at http://${HostName}:$Port/"
+  exit 0
+}
+
 $argsList = @(
   "-NoProfile",
   "-ExecutionPolicy", "Bypass",
   "-File", (Join-Path $root "run.ps1"),
   "-Port", "$Port",
-  "-HostName", "$HostName"
+  "-HostName", "$HostName",
+  "-NodePath", ('"' + $nodeExecutable + '"')
 )
 
-$process = Start-Process -FilePath "powershell.exe" `
+$process = Start-Process -FilePath (Join-Path $PSHOME "powershell.exe") `
   -ArgumentList $argsList `
   -WorkingDirectory $root `
   -WindowStyle Hidden `

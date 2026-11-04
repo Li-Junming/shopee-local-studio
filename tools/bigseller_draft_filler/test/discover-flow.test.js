@@ -21,14 +21,30 @@ test("source lookup does not accept SKU-only rows when a source store is require
   assert.doesNotMatch(source, /searchSourceRowBySkuGroup\(activePage, activeListUrl, product\.skus, ""\)/);
 });
 
-test("copy dialog store selection does not toggle already checked stores off", async () => {
+test("source edit retry neutralizes only the known BigSeller feedback panel", async () => {
   const source = await readFile(new URL("../src/fill-drafts.js", import.meta.url), "utf8");
+  const editFlow = source.slice(
+    source.indexOf("async function neutralizeBigSellerFeedbackPanel"),
+    source.indexOf("async function findSourceRowIndex")
+  );
+
+  assert.match(editFlow, /\.right_nav_menu/);
+  assert.match(editFlow, /pointer-events/);
+  assert.match(editFlow, /feedbackPanelNeutralized/);
+  assert.match(editFlow, /Recovered edit URL from an already-opened BigSeller page/);
+  assert.doesNotMatch(editFlow, /force: true/);
+});
+
+test("copy dialog store selection does not toggle already checked stores off", async () => {
+  const source = await readFile(new URL("../src/copy-dialog.js", import.meta.url), "utf8");
   const selector = source.slice(
     source.indexOf("async function selectCopyDialogStores"),
     source.indexOf("async function confirmCopyDialog")
   );
 
   assert.match(selector, /checked/);
-  assert.match(selector, /if \(!box\.checked\)/);
-  assert.doesNotMatch(selector, /await page\.mouse\.click\(box\.x \+ box\.width \/ 2, box\.y \+ box\.height \/ 2\);\s*await page\.waitForTimeout\(150\);\s*selected\.push/s);
+  assert.match(selector, /if \(!await checkbox\.isChecked/);
+  assert.match(selector, /scrollIntoViewIfNeeded/);
+  assert.match(selector, /await assertCopyDialogSelection/);
+  assert.doesNotMatch(selector, /page\.mouse\.click/);
 });

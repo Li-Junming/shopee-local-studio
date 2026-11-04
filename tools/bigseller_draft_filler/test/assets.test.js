@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { loadStoreAssets } from "../src/assets.js";
+import { loadStoreAssets, fingerprintAssets } from "../src/assets.js";
 
 test("loads title, detail, and sorted PNG product images", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "bigseller-assets-"));
@@ -43,4 +43,18 @@ test("requires title, detail, and at least one PNG image", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('save asset signatures change when copy or image bytes change', async t => {
+  const root = await mkdtemp(path.join(tmpdir(), 'bigseller-signature-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const file = path.join(root, '01.png');
+  await writeFile(file, 'first image');
+  const assets = { title: 'Title', detail: 'Detail', images: [file] };
+  const first = await fingerprintAssets(assets);
+  const copyOnly = await fingerprintAssets(assets, { skipImages: true });
+  assert.notEqual(await fingerprintAssets({ ...assets, detail: 'Updated detail' }), first);
+  await writeFile(file, 'second image');
+  assert.notEqual(await fingerprintAssets(assets), first);
+  assert.equal(await fingerprintAssets(assets, { skipImages: true }), copyOnly);
 });

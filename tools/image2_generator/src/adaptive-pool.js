@@ -9,6 +9,7 @@ export function runAdaptivePool(items, options, worker) {
     positiveInteger(options?.fallbackConcurrency, "fallbackConcurrency")
   );
   const isRetryable = options?.isRetryable || (() => false);
+  const isFatal = options?.isFatal || (() => false);
   const onDowngrade = options?.onDowngrade || (() => {});
   const onRequeue = options?.onRequeue || (() => {});
   const onFailure = options?.onFailure || (() => {});
@@ -21,7 +22,7 @@ export function runAdaptivePool(items, options, worker) {
     let concurrency = maxConcurrency;
     let active = 0;
     let fatalError = null;
-    let retryableFailures = 0;
+    let consecutiveRetryableFailures = 0;
     let settled = false;
 
     const schedule = () => {
@@ -46,10 +47,33 @@ export function runAdaptivePool(items, options, worker) {
           .then(() => worker(entry.item))
           .then(() => {
             active -= 1;
+            // A successful image proves that the upstream route recovered.
+            // Only consecutive transient failures should trip the circuit.
+            consecutiveRetryableFailures = 0;
             schedule();
           }, (error) => {
             active -= 1;
-            if (isRetryable(error) && !entry.fallbackRetried) {
+            // Stop dispatching queued work on account-wide failures. Let already
+            // active work settle without hiding the original authentication error.
+            if (fatalError || isFatal(error)) {
+              fatalError ??= error;
+              failures.push({ item: entry.item, error });
+              onFailure({ item: entry.item, error });
+              schedule();
+              return;
+            }
+            const retryable = isRetryable(error);
+            if (retryable) {
+              consecutiveRetryableFailures += 1;
+              if (maxRetryableFailures && consecutiveRetryableFailures >= maxRetryableFailures) {
+                failures.push({ item: entry.item, error });
+                onFailure({ item: entry.item, error });
+                fatalError = new Error(`Too many consecutive retryable failures (${consecutiveRetryableFailures}); image API appears unstable. Last error: ${error.message}`);
+                schedule();
+                return;
+              }
+            }
+            if (retryable && !entry.fallbackRetried) {
               entry.fallbackRetried = true;
               const previousConcurrency = concurrency;
               concurrency = fallbackConcurrency;
@@ -57,16 +81,12 @@ export function runAdaptivePool(items, options, worker) {
                 onDowngrade({ from: previousConcurrency, to: concurrency, error });
               }
               onRequeue({ item: entry.item, error });
-              queue.unshift(entry);
+              // Move a stalled image behind untouched work. This avoids spending
+              // several consecutive timeout windows on the same output.
+              queue.push(entry);
             } else {
               failures.push({ item: entry.item, error });
               onFailure({ item: entry.item, error });
-              if (isRetryable(error)) {
-                retryableFailures += 1;
-                if (maxRetryableFailures && retryableFailures >= maxRetryableFailures) {
-                  fatalError = new Error(`Too many retryable failures (${retryableFailures}); image API appears unstable. Last error: ${error.message}`);
-                }
-              }
               if (!continueOnError) fatalError = error;
             }
             schedule();

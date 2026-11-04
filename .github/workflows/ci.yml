@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install dependencies
         working-directory: ${{ matrix.module }}
@@ -32,3 +32,10 @@ jobs:
       - name: Run tests
         working-directory: ${{ matrix.module }}
         run: npm test
+      - name: Check public release files
+        if: matrix.module == 'tools/shopee_local_studio'
+        run: node scripts/check-release-files.mjs
+      - name: Verify update and rollback
+        if: matrix.module == 'tools/shopee_local_studio'
+        shell: powershell
+        run: ./scripts/test-deployment.ps1

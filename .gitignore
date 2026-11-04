@@ -39,3 +39,16 @@ tools/shopee_product_pipeline/
 *.zip
 *.7z
 *.rar
+
+# Per-computer deployment state, backups, runtimes and browser credentials
+.studio-runtime/
+.studio-backups/
+.studio-updates/
+runtime/
+watermarks/
+**/.chrome-profile/
+**/bigseller-chrome-profile/
+**/storage-state*.json
+**/auth-state*.json
+**/*.save-progress.json
+**/*.log

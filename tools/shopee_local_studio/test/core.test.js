@@ -1,8 +1,9 @@
-﻿import assert from "node:assert/strict";
+import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
 import {
   buildBigSellerCopyConfig,
+  buildBigSellerStoreMap,
   buildBigSellerSkuConfig,
   buildBigSellerSourceConfig,
   buildImage2CliArgs,
@@ -22,6 +23,7 @@ import {
   parseTaskText,
   parseSkuGroup,
   pipelineStartBlockers,
+  pipelineStageForStatus,
   pipelineStageCompleted,
   recordPipelineTiming,
   removeProductCodeMapping,
@@ -180,9 +182,26 @@ test("storesFor resolves supported target stores and rejects unknown stores", ()
   assert.throws(() => storesFor(["10"]), /Unsupported store/);
 });
 
-test("resolveTargetStoreIds defaults empty input to stores 4 through 9", () => {
-  assert.deepEqual(resolveTargetStoreIds([]), ["4", "5", "6", "7", "8", "9"]);
-  assert.deepEqual(resolveTargetStoreIds(""), ["4", "5", "6", "7", "8", "9"]);
+test("warehouse 2 stores map to their exact BigSeller names and distinct folders", () => {
+  const storeIds = ["2仓1", "2仓2", "2仓3", "2仓4"];
+
+  assert.deepEqual(storesFor(storeIds).map((store) => store.folder), [
+    "store_warehouse_2_1",
+    "store_warehouse_2_2",
+    "store_warehouse_2_3",
+    "store_warehouse_2_4"
+  ]);
+  assert.deepEqual(buildBigSellerStoreMap(storeIds), [
+      { match: "陈--平政--1店", folder: "store_warehouse_2_1" },
+      { match: "陈--平政--2店", folder: "store_warehouse_2_2" },
+      { match: "陈--平政--3店", folder: "store_warehouse_2_3" },
+      { match: "陈--平政--4店", folder: "store_warehouse_2_4" }
+  ]);
+});
+
+test("resolveTargetStoreIds requires an explicit store selection", () => {
+  assert.deepEqual(resolveTargetStoreIds([]), []);
+  assert.deepEqual(resolveTargetStoreIds(""), []);
   assert.deepEqual(resolveTargetStoreIds(["5", "9"]), ["5", "9"]);
 });
 
@@ -196,8 +215,12 @@ test("buildImage2Config creates four PNG jobs per selected store", () => {
     notes: "pink bottle"
   });
 
+  assert.equal(config.model, "gpt-image-2.5");
   assert.equal(config.outputSize, 800);
   assert.equal(config.concurrency, 1);
+  assert.equal(config.requestTimeoutMs, 180000);
+  assert.equal(config.requestMaxAttempts, 1);
+  assert.equal(config.maxRetryableFailures, 2);
   assert.equal(config.jobs.length, 8);
   assert.equal(config.jobs[0].out, "store_7_skinora/01_product.png");
   assert.equal(config.jobs[1].out, "store_7_skinora/02_effect.png");
@@ -228,6 +251,7 @@ test("describeImage2Runtime reports missing key and local proxy settings", async
   assert.deepEqual(describeImage2Runtime({ OPENAI_BASE_URL: "http://localhost:54273/v1" }), {
     apiKeySet: false,
     baseUrl: "http://localhost:54273/v1",
+    model: "gpt-image-2.5",
     localProxy: { host: "localhost", port: 54273 }
   });
 
@@ -242,12 +266,19 @@ test("image API config is normalized, redacted, and preferred over process env",
 
   assert.deepEqual(config, {
     baseUrl: "http://localhost:54273/v1",
-    apiKey: "sk-local-secret-123456"
+    apiKey: "sk-local-secret-123456",
+    model: "gpt-image-2.5"
   });
   assert.deepEqual(publicImageApiConfig(config), {
     baseUrl: "http://localhost:54273/v1",
+    model: "gpt-image-2.5",
     apiKeySet: true,
-    maskedApiKey: "sk-****3456"
+    maskedApiKey: "sk-****3456",
+    fallbackEnabled: false,
+    fallbackBaseUrl: "",
+    fallbackModel: "gpt-image-2.5",
+    fallbackApiKeySet: false,
+    maskedFallbackApiKey: ""
   });
   assert.deepEqual(effectiveImageApiEnv({
     OPENAI_API_KEY: "env-key",
@@ -264,10 +295,35 @@ test("image API config is normalized, redacted, and preferred over process env",
   }, config), {
     apiKeySet: true,
     baseUrl: "http://localhost:54273/v1",
+    model: "gpt-image-2.5",
     localProxy: { host: "localhost", port: 54273 },
     configSource: "local"
   });
   assert.throws(() => normalizeImageApiConfig({ baseUrl: "not a url", apiKey: "sk-x" }), /Invalid API URL/);
+});
+
+test("image API config preserves an independent fallback relay without exposing keys", () => {
+  const config = normalizeImageApiConfig({
+    baseUrl: "http://localhost:51257/v1",
+    apiKey: "primary-secret-1234",
+    model: "gpt-image-2.5",
+    fallbackBaseUrl: "https://relay.example.com/v1/",
+    fallbackApiKey: "fallback-secret-5678",
+    fallbackModel: "image-model-v2"
+  });
+  assert.equal(config.fallbackBaseUrl, "https://relay.example.com/v1");
+  assert.equal(config.fallbackModel, "image-model-v2");
+  assert.deepEqual(publicImageApiConfig(config), {
+    baseUrl: "http://localhost:51257/v1",
+    model: "gpt-image-2.5",
+    apiKeySet: true,
+    maskedApiKey: "pri****1234",
+    fallbackEnabled: true,
+    fallbackBaseUrl: "https://relay.example.com/v1",
+    fallbackModel: "image-model-v2",
+    fallbackApiKeySet: true,
+    maskedFallbackApiKey: "fal****5678"
+  });
 });
 
 test("buildImage2Config appends each target store frame only to that store jobs", () => {
@@ -384,8 +440,8 @@ test("buildImage2Config tells each store not to reuse sibling store layouts", ()
   const store4Prompt = config.jobs.find((job) => job.out.startsWith("store_4_skinora_care/01_product"))?.prompt || "";
   const store5Prompt = config.jobs.find((job) => job.out.startsWith("store_5_skinora_fresh/01_product"))?.prompt || "";
 
-  assert.match(store4Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of Store 5 Skinora Fresh/);
-  assert.match(store5Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of Store 4 Skinora Care/);
+  assert.match(store4Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of 陈--胡志明--5店/);
+  assert.match(store5Prompt, /Do not reuse the layout, palette, hero crop, or benefit hierarchy of 陈--胡志明--4店/);
 });
 
 test("buildImage2Config includes stable style anchors for stores 4 through 9", () => {
@@ -644,6 +700,15 @@ test("source row SKU values are used for BigSeller draft lookup after Item ID so
   assert.deepEqual(config.discoverJobs[0].skus, ["YSLD80301", "YSLD80302", "YSLD80303"]);
 });
 
+test("source SKU extraction ignores marketing tokens before the seller SKU section", () => {
+  const sourceRowText = "ANESSA Sunscreen Gel 90g SPF50+ PA++++ Item ID: 40782893259 store 1 -- AN86001 SKU ID: 307813177862 VND 580,000 AN86002 SKU ID: 307813177863 VND";
+
+  assert.deepEqual(
+    extractSourceDraftSkuGroup({ sourceRowText }),
+    ["AN86001", "AN86002"]
+  );
+});
+
 test("source draft SKU values are ignored until the current source is confirmed", () => {
   const unconfirmed = {
     skuGroup: ["57414971469"],
@@ -682,6 +747,14 @@ test("buildBigSellerCopyConfig writes copy jobs from 1-store to target stores", 
     "store_7_skinora",
     "store_8_skinora_beauty",
     "store_9_elora_skin"
+  ]);
+  assert.deepEqual(config.storeMap.map((store) => store.match), [
+    "陈--胡志明--4店",
+    "陈--胡志明--5店",
+    "陈--胡志明--6店",
+    "陈--胡志明--7店",
+    "陈--胡志明--8店",
+    "陈--胡志明--9店"
   ]);
   assert.deepEqual(config.copyJobs[0].skus, ["LC860101", "LC860102"]);
   assert.deepEqual(config.copyJobs[0].itemIds, ["53765401701"]);
@@ -723,7 +796,7 @@ test("validateVietnameseListing enforces title length, diacritics, and buyer-fac
     title: "Qua ngan",
     detail: "SKU YSLD80501"
   }).errors, [
-    "Title must be 90-99 characters.",
+    "Title must be 90-100 characters.",
     "Title and detail must not contain SKU or full SKU codes.",
     "Title and detail must use Vietnamese with diacritics.",
     "Detail is too short for buyer-facing product effects."
@@ -738,7 +811,7 @@ test("makeListingDraft returns diacritic Vietnamese buyer-facing title and detai
   });
 
   assert.ok(titleDisplayLength(listing.title) >= 90);
-  assert.ok(titleDisplayLength(listing.title) <= 99);
+  assert.ok(titleDisplayLength(listing.title) <= 100);
   assert.equal(VIETNAMESE_DIACRITIC_RE.test(listing.title + listing.detail), true);
   assert.equal(validateVietnameseListing(listing).valid, true);
 });
@@ -751,7 +824,7 @@ test("makeListingDraft pads short product names to Shopee title length", () => {
   });
 
   assert.ok(titleDisplayLength(listing.title) >= 90);
-  assert.ok(titleDisplayLength(listing.title) <= 99);
+  assert.ok(titleDisplayLength(listing.title) <= 100);
 });
 
 test("makeListingDraft never adds Shopee into buyer-facing copy", () => {
@@ -774,7 +847,7 @@ test("makeListingDraft styles only listing titles with double-struck brand and b
 
   assert.match(listing.title, /[\u{1D400}-\u{1D7FF}]/u);
   assert.ok(titleDisplayLength(listing.title) >= 90, listing.title);
-  assert.ok(titleDisplayLength(listing.title) <= 99, listing.title);
+  assert.ok(titleDisplayLength(listing.title) <= 100, listing.title);
   assert.equal(listing.detail.startsWith("L'OCCITANE Shea Butter Hand Cream"), true);
   assert.equal(/[\u{1D400}-\u{1D7FF}]/u.test(listing.detail), false);
   assert.equal(validateVietnameseListing(listing).valid, true);
@@ -788,7 +861,7 @@ test("makeListingDraft keeps styled title within platform textarea counter", () 
   });
 
   assert.ok(titleDisplayLength(listing.title) >= 90, listing.title);
-  assert.ok(titleDisplayLength(listing.title) <= 99, listing.title);
+  assert.ok(titleDisplayLength(listing.title) <= 100, listing.title);
   assert.equal(/\b(?:phu|cho|tai)$/i.test(folded(listing.title)), false, listing.title);
   assert.equal(validateVietnameseListing(listing).valid, true);
 });
@@ -802,7 +875,7 @@ test("makeListingDraft counts styled Unicode title by visible characters", () =>
 
   assert.ok(listing.title.length > titleDisplayLength(listing.title), listing.title);
   assert.ok(titleDisplayLength(listing.title) >= 90, listing.title);
-  assert.ok(titleDisplayLength(listing.title) <= 99, listing.title);
+  assert.ok(titleDisplayLength(listing.title) <= 100, listing.title);
   assert.equal(validateVietnameseListing(listing).valid, true);
 });
 
@@ -826,6 +899,20 @@ test("makeListingDraft creates differentiated buyer copy for each store", () => 
   assert.equal(validateVietnameseListing(store9).valid, true);
 });
 
+test("makeListingDraft keeps all ten store copies stable and distinct", () => {
+  const base = {
+    productName: "SKINCEUTICALS Phloretin CF 30ml Serum Vitamin C",
+    notes: "serum vitamin C chong oxy hoa, lam sang va deu mau da"
+  };
+  const storeIds = ["4", "5", "6", "7", "8", "9", "2\u4ed31", "2\u4ed32", "2\u4ed33", "2\u4ed34"];
+  const first = storeIds.map((storeId) => makeListingDraft({ ...base, storeId }));
+  const second = storeIds.map((storeId) => makeListingDraft({ ...base, storeId }));
+
+  assert.deepEqual(first, second, "same input should keep deterministic copy");
+  assert.equal(new Set(first.map((listing) => listing.title)).size, storeIds.length, "titles should differ by store");
+  assert.equal(new Set(first.map((listing) => listing.detail)).size, storeIds.length, "details should differ by store");
+  for (const listing of first) assert.equal(validateVietnameseListing(listing).valid, true);
+});
 test("makeListingDraft makes ecommerce titles start with English identity and vary by benefit", () => {
   const base = {
     productName: "ESTEE LAUDER Nutritious 2-in-1 Foam Cleanser 125ml Sua Rua Mat 2in1 Lam Sach & Thanh Loc Da",
@@ -838,7 +925,7 @@ test("makeListingDraft makes ecommerce titles start with English identity and va
   for (const { title, detail } of listings) {
     assert.ok(plainTitle(title).startsWith(identity), title);
     assert.ok(titleDisplayLength(title) >= 90, title);
-    assert.ok(titleDisplayLength(title) <= 99, title);
+    assert.ok(titleDisplayLength(title) <= 100, title);
     assert.match(title, /, /, title);
     assert.equal(/\bShopee\b/i.test(title), false, title);
     assert.equal(/\bchinh hang\b/i.test(title), false, title);
@@ -846,7 +933,7 @@ test("makeListingDraft makes ecommerce titles start with English identity and va
   }
   assert.equal(new Set(titles).size, 3, titles.join("\n"));
   assert.match(folded(titles[0]), /Lam sach sau|Loai bo bui ban|mem min/i);
-  assert.match(folded(titles[1]), /lo chan long|sach nhe|be mat/i);
+  assert.match(folded(titles[1]), /lo chan long|sach nhe|be mat|dau thua|thoang mat/i);
   assert.match(folded(titles[2]), /Thanh loc|duong am|hang ngay/i);
 });
 
@@ -891,7 +978,7 @@ test("makeListingDraft uses one buyer-copy standard with differentiated lower mo
   const listings = ["7", "8", "9"].map((storeId) => makeListingDraft({ ...base, storeId }));
 
   for (const listing of listings) {
-    assert.ok(titleDisplayLength(listing.title) >= 90 && titleDisplayLength(listing.title) <= 99, listing.title);
+    assert.ok(titleDisplayLength(listing.title) >= 90 && titleDisplayLength(listing.title) <= 100, listing.title);
     assert.ok(plainTitle(listing.title).startsWith("ESTEE LAUDER Nutritious 2-in-1 Foam"), listing.title);
     assert.equal(VIETNAMESE_DIACRITIC_RE.test(listing.title + listing.detail), true);
     assert.equal(/\b(?:Shopee|SKU|chinh hang|ban hang chinh hang|cam ket|100%)\b/i.test(folded(listing.title + listing.detail)), false);
@@ -1107,7 +1194,7 @@ test("validateVietnameseListing rejects platform words, SKU codes, Chinese, miss
   };
 
   assert.deepEqual(validateVietnameseListing(listing).errors, [
-    "Title must be 90-99 characters.",
+    "Title must be 90-100 characters.",
     "Title and detail must not contain Shopee.",
     "Title and detail must not contain authenticity claims.",
     "Title and detail must not contain SKU or full SKU codes.",
@@ -1204,7 +1291,7 @@ test("buildImageResultSummary includes normalized image review state", () => {
     imageReview: {
       status: "delivered",
       flags: ["layout_similar", "bad_flag"],
-      notes: "sent to reviewer"
+      notes: "sent to boss"
     }
   }, [
     { store: "7", storeLabel: "Store 7", file: "store_7/01.png", url: "/image/1" }
@@ -1213,7 +1300,7 @@ test("buildImageResultSummary includes normalized image review state", () => {
   assert.deepEqual(summary.imageReview, {
     status: "delivered",
     flags: ["layout_similar"],
-    notes: "sent to reviewer",
+    notes: "sent to boss",
     updatedAt: ""
   });
 });
@@ -1653,10 +1740,23 @@ test("buildTaskProgress explains waiting source confirmation", () => {
 
 test("buildTaskProgress maps active pipeline stages", () => {
   assert.equal(buildTaskProgress({ status: "pipeline_generating_images" }).stage, "image_generation");
+  const waiting = buildTaskProgress({ status: "pipeline_waiting_image_api" });
+  assert.equal(waiting.stage, "image_generation");
+  assert.equal(waiting.level, "running");
+  assert.match(waiting.label, /冷却等待/);
   assert.equal(buildTaskProgress({ status: "pipeline_copying_source_to_bigseller_drafts" }).stage, "bigseller_copy");
   assert.equal(buildTaskProgress({ status: "copying_source_to_bigseller_drafts" }).stage, "bigseller_copy");
   assert.equal(buildTaskProgress({ status: "pipeline_discovering_bigseller_drafts" }).stage, "bigseller_discover");
   assert.equal(buildTaskProgress({ status: "pipeline_saving_bigseller_drafts" }).stage, "bigseller_save");
+});
+
+test("pipeline timing keeps image stage active during API cooldown", () => {
+  assert.equal(pipelineStageForStatus("pipeline_waiting_image_api"), "image_generation");
+  let timing = recordPipelineTiming(null, "pipeline_generating_images", "2026-10-25T10:00:00.000Z");
+  timing = recordPipelineTiming(timing, "pipeline_waiting_image_api", "2026-10-25T10:05:00.000Z");
+  assert.equal(timing.activeStage, "image_generation");
+  assert.equal(timing.finishedAt, "");
+  assert.equal(timing.stages.image_generation.finishedAt, undefined);
 });
 
 test("buildTaskProgress maps completed manual steps to the next visible step", () => {

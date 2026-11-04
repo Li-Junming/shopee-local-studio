@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$Config = "jobs.image2.example.json",
   [switch]$DryRun,
   [switch]$Overwrite,

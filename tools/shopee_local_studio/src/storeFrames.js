@@ -1,5 +1,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const savedConfigPath = fileURLToPath(new URL("../data/store-frame-config.json", import.meta.url));
+
+export async function configuredStoreFrameRoot({ env = process.env, configPath = savedConfigPath } = {}) {
+  if (env.SHOPEE_STORE_FRAME_ROOT) return env.SHOPEE_STORE_FRAME_ROOT;
+  let saved;
+  try {
+    saved = JSON.parse(await fs.readFile(configPath, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return defaultStoreFrameRoot(env);
+    throw new Error(`Cannot read store frame directory configuration: ${error.message}`);
+  }
+  if (typeof saved.root !== "string" || !path.isAbsolute(saved.root)) {
+    throw new Error("Store frame directory configuration requires an absolute root path.");
+  }
+  return saved.root;
+}
 
 export function defaultStoreFrameRoot(env = process.env) {
   return env.SHOPEE_STORE_FRAME_ROOT || path.join(
@@ -10,8 +28,8 @@ export function defaultStoreFrameRoot(env = process.env) {
   );
 }
 
-export async function resolveStoreFrameAssets({ root = defaultStoreFrameRoot(), storeIds = [] } = {}) {
-  const normalizedRoot = path.resolve(root);
+export async function resolveStoreFrameAssets({ root, storeIds = [], env = process.env, configPath } = {}) {
+  const normalizedRoot = path.resolve(root ?? await configuredStoreFrameRoot({ env, configPath }));
   const ids = storeIds.map(String).filter(Boolean);
   const files = await listImageFiles(normalizedRoot).catch(() => []);
   const frames = {};
@@ -58,9 +76,11 @@ async function listImageFiles(root) {
 
 function isStoreFrameFile(fileName, storeId) {
   const name = String(fileName || "");
-  return name.includes(`${storeId}\u5e97`)
-    && /(\u6c34\u5370|\u8fb9\u6846|\u908a\u6846|\u6846)/u.test(name)
-    && !/\u5934\u50cf|\u982d\u50cf/u.test(name);
+  const compactName = name.replace(/\s+/gu, "");
+  const compactStoreId = String(storeId || "").replace(/\s+/gu, "");
+  return compactName.includes(`${compactStoreId}\u5e97`)
+    && /(\u6c34\u5370|\u8fb9\u6846|\u908a\u6846|\u6846)/u.test(compactName)
+    && !/\u5934\u50cf|\u982d\u50cf/u.test(compactName);
 }
 
 function compareFrameCandidates(a, b) {

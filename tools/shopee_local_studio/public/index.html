@@ -12,56 +12,121 @@
         <span class="brand-mark">SL</span>
         <div>
         <h1>Shopee Local Studio</h1>
-        <p>Item ID/SKU &#20219;&#21153; &middot; &#24215;&#38138;&#22270;&#32452; &middot; &#33609;&#31295;&#31665;&#33258;&#21160;&#20445;&#23384;</p>
+        <p>&#26412;&#22320;&#21830;&#21697;&#24037;&#20316;&#21488; &middot; &#20174;&#26469;&#28304;&#30830;&#35748;&#21040; BigSeller &#33609;&#31295;</p>
         </div>
       </div>
-      <button id="refreshBtn" type="button">&#21047;&#26032;</button>
+      <div class="topbar-actions">
+        <span class="local-status"><i></i>&#26412;&#26426;&#26381;&#21153;&#27491;&#24120;</span>
+        <button id="refreshBtn" type="button">&#21047;&#26032;&#39029;&#38754;</button>
+      </div>
     </header>
+
+    <nav class="flow-overview" aria-label="&#24037;&#20316;&#27969;&#31243;">
+      <div><span>1</span><strong>&#36755;&#20837;&#21830;&#21697;</strong><small>Item ID / SKU</small></div>
+      <div><span>2</span><strong>&#30830;&#35748;&#26469;&#28304;</strong><small>1&#24215;&#21830;&#21697;&#26680;&#23545;</small></div>
+      <div><span>3</span><strong>&#29983;&#25104;&#24215;&#38138;&#22270;</strong><small>&#21508;&#24215;&#39118;&#26684;&#21644;&#27700;&#21360;</small></div>
+      <div><span>4</span><strong>&#36865;&#21040; BigSeller</strong><small>&#22797;&#21046;&#19982;&#20445;&#23384;&#33609;&#31295;</small></div>
+    </nav>
 
     <main class="layout">
       <section class="panel create-panel">
         <div class="panel-title">
-          <span class="eyebrow">&#26085;&#24120;&#20837;&#21475;</span>
-          <h2>&#26032;&#20219;&#21153;</h2>
+          <span class="eyebrow">STEP 01</span>
+          <h2>&#21019;&#24314;&#26032;&#20219;&#21153;</h2>
+          <p>&#31896;&#36148;&#19968;&#20010; Item ID &#25110; SKU&#65292;&#20854;&#20313;&#27493;&#39588;&#20132;&#32473;&#31995;&#32479;&#12290;</p>
         </div>
 
-        <details class="api-config-section advanced-section" open>
+        <div class="workflow-card">
+          <div class="quick-box">
+          <div class="quick-intro">
+            <span class="step-badge">&#24555;&#36895;&#24320;&#22987;</span>
+            <strong>&#36755;&#20837;&#21830;&#21697;&#32534;&#21495;</strong>
+            <small>&#25903;&#25345; Item ID&#12289;&#21333;&#20010; SKU &#25110;&#22810;&#20010; SKU</small>
+          </div>
+          <label>
+            &#31896;&#36148; Item ID/SKU
+            <textarea id="quickTaskText" rows="5" placeholder="&#20363;&#22914;&#65306;45215609694&#10;&#20063;&#21487;&#31896;&#36148;&#65306;SF86102"></textarea>
+          </label>
+          <div class="field quick-store-field">
+            <span>&#30446;&#26631;&#24215;&#38138;&#65288;&#21487;&#22810;&#36873;&#65289;</span>
+            <div id="storeChecks" class="store-grid"></div>
+          </div>
+          <div class="inline-actions">
+            <button id="parseQuickBtn" type="button">&#35299;&#26512;&#21040;&#34920;&#21333;</button>
+            <button id="createRunBtn" class="primary" type="button">&#21019;&#24314;&#24182;&#24320;&#22987;</button>
+          </div>
+          <p class="hint">&#35831;&#20808;&#21246;&#36873;&#26412;&#27425;&#38656;&#35201;&#38138;&#36135;&#30340;&#30446;&#26631;&#24215;&#38138;&#12290;1 &#24215;&#21830;&#21697;&#38656;&#35201;&#30830;&#35748;&#26102;&#20250;&#20808;&#26242;&#20572;&#65292;&#30830;&#35748;&#21518;&#20877;&#28857;&#19968;&#38190;&#32487;&#32493;&#12290;</p>
+          </div>
+        </div>
+
+        <section class="batch-queue-card" aria-labelledby="batchQueueTitle">
+          <div class="batch-queue-head">
+            <div>
+              <span class="eyebrow">批量顺序处理</span>
+              <h3 id="batchQueueTitle">一次粘贴，逐个自动执行</h3>
+              <p>每行一个 Item ID/SKU，使用上方已勾选的目标店铺。前一个完整完成后才开始下一个。</p>
+            </div>
+            <span id="batchQueueStatus" class="batch-status empty">未创建</span>
+          </div>
+          <label>
+            商品清单（每行一个）
+            <textarea id="batchTaskText" rows="6" placeholder="例如：&#10;42979320662&#10;53368953856&#10;SF86102"></textarea>
+          </label>
+          <div id="batchQueueSummary" class="batch-queue-summary">尚未创建批量队列。</div>
+          <div id="batchQueueItems" class="batch-queue-items"></div>
+          <div class="batch-queue-actions">
+            <button id="batchCreateStartBtn" class="primary" type="button">创建并开始批量</button>
+            <button id="batchPauseBtn" type="button" disabled>暂停排队</button>
+            <button id="batchResumeBtn" type="button" disabled>继续队列</button>
+            <button id="batchSkipBtn" type="button" disabled>跳过当前项</button>
+          </div>
+          <p class="hint">失败或需要确认 1 店商品时会自动暂停，不会跳过故障继续，也不会发布商品。</p>
+        </section>
+
+        <details class="api-config-section advanced-section">
           <summary>
-            <span>API &#37197;&#32622;</span>
-            <small>&#29983;&#22270;&#25509;&#21475;&#21644;&#23494;&#38053;</small>
+            <span>API &#19982;&#29983;&#22270;&#26381;&#21153;</span>
+            <small>&#26085;&#24120;&#26080;&#38656;&#25171;&#24320;</small>
           </summary>
           <form id="apiConfigForm" class="api-config-form">
             <div id="apiConfigStatus" class="api-config-status">&#27491;&#22312;&#26816;&#27979; API &#37197;&#32622;...</div>
             <label>
-              &#25509;&#21475; URL
+              主中转站 URL
               <input id="apiBaseUrl" name="baseUrl" autocomplete="off" placeholder="https://api.openai.com/v1">
             </label>
             <label>
-              API &#23494;&#38053;
+              主中转站 API 密钥
               <input id="apiKey" name="apiKey" type="password" autocomplete="new-password" placeholder="&#30041;&#31354;&#34920;&#31034;&#20445;&#25345;&#24050;&#20445;&#23384;&#23494;&#38053;">
             </label>
+            <label>
+              主中转站图片模型
+              <input id="apiModel" name="model" autocomplete="off" placeholder="gpt-image-2.5">
+            </label>
+            <fieldset class="api-fallback-fields">
+              <legend>备用中转站（可选，主线路失败时自动切换）</legend>
+              <label>
+                备用中转站 URL
+                <input id="apiFallbackBaseUrl" name="fallbackBaseUrl" autocomplete="off" placeholder="https://relay.example.com/v1">
+              </label>
+              <label>
+                备用中转站 API 密钥
+                <input id="apiFallbackKey" name="fallbackApiKey" type="password" autocomplete="new-password" placeholder="留空表示保持已保存密钥">
+              </label>
+              <label>
+                备用中转站图片模型
+                <input id="apiFallbackModel" name="fallbackModel" autocomplete="off" placeholder="gpt-image-2.5">
+              </label>
+              <p id="apiFallbackStatus" class="hint">未启用备用中转站。</p>
+            </fieldset>
             <div class="inline-actions">
               <button id="saveApiConfigBtn" class="primary" type="submit">&#20445;&#23384;&#37197;&#32622;</button>
               <button id="testApiConfigBtn" type="button">&#37325;&#26032;&#26816;&#27979;</button>
               <button id="clearApiConfigBtn" class="danger" type="button">&#28165;&#38500;&#37197;&#32622;</button>
             </div>
             <p id="apiKeyStatus" class="hint">&#23494;&#38053;&#21482;&#20445;&#23384;&#22312;&#26412;&#26426;&#65292;&#39029;&#38754;&#19981;&#20250;&#26174;&#31034;&#23436;&#25972;&#23494;&#38053;&#12290;</p>
+            <p class="hint">注意：配置检测只确认 URL、密钥和本地连接状态；只有实际图片请求才能验证中转站的生图上游。</p>
           </form>
         </details>
-
-        <div class="workflow-card">
-          <div class="quick-box">
-          <label>
-            &#31896;&#36148; Item ID/SKU
-            <textarea id="quickTaskText" rows="8" placeholder="Item ID: YSLD80501&#10;SKU: YSLD80501 YSLD80502&#10;&#30452;&#25509;&#31896;&#36148; Item ID &#25110; SKU&#65292;&#40664;&#35748;&#33258;&#21160;&#29983;&#25104; 4-9 &#24215;"></textarea>
-          </label>
-          <div class="inline-actions">
-            <button id="parseQuickBtn" type="button">&#35299;&#26512;&#21040;&#34920;&#21333;</button>
-            <button id="createRunBtn" class="primary" type="button">&#21019;&#24314;&#24182;&#24320;&#22987;</button>
-          </div>
-          <p class="hint">&#21482;&#38656;&#36755;&#20837; Item ID &#25110; SKU&#65307;&#31995;&#32479;&#20250;&#33258;&#21160;&#20351;&#29992; 4-9 &#24215;&#36793;&#26694;&#21644;&#24215;&#38138;&#39118;&#26684;&#29983;&#25104;&#22270;&#12290;1 &#24215;&#21830;&#21697;&#38656;&#35201;&#30830;&#35748;&#26102;&#20250;&#20808;&#26242;&#20572;&#65292;&#30830;&#35748;&#21518;&#20877;&#28857;&#19968;&#38190;&#32487;&#32493;&#12290;</p>
-          </div>
-        </div>
 
         <details class="advanced-section">
           <summary>
@@ -77,10 +142,6 @@
             Item ID/SKU &#32452;
             <textarea name="skuGroup" rows="3" placeholder="YSLD80501 YSLD80502"></textarea>
           </label>
-          <div class="field">
-            <span>&#30446;&#26631;&#24215;&#38138;</span>
-            <div id="storeChecks" class="store-grid"></div>
-          </div>
           <label>
             &#21830;&#21697;&#22270;&#36335;&#24452;
             <textarea name="sourceImages" rows="7" placeholder="&#27599;&#34892;&#19968;&#20010;&#26412;&#22320;&#22270;&#29255;&#36335;&#24452;&#65292;&#20063;&#21487;&#20197;&#30452;&#25509; Ctrl+V &#31896;&#36148;&#22270;&#29255;"></textarea>
@@ -130,8 +191,9 @@
       <section class="panel work-panel">
         <div class="section-head workspace-head">
           <div class="panel-title">
-            <span class="eyebrow">&#24037;&#20316;&#21488;</span>
-            <h2>&#20219;&#21153;</h2>
+            <span class="eyebrow">STEP 02</span>
+            <h2>&#24403;&#21069;&#20219;&#21153;</h2>
+            <p>&#20808;&#30475;&#29366;&#24577;&#21644;&#19979;&#19968;&#27493;&#65292;&#20877;&#25191;&#34892;&#19968;&#38190;&#27969;&#31243;&#12290;</p>
           </div>
         </div>
 
@@ -181,6 +243,9 @@
         <div id="emptyState" class="empty">&#26242;&#26080;&#20219;&#21153;</div>
         <div id="taskView" hidden>
           <section class="workflow-card task-command">
+            <div class="live-status-row">
+              <span id="liveRefreshState" class="live-refresh-state ready">&#9679; &#33258;&#21160;&#21047;&#26032;&#65306;2&#31186;</span>
+            </div>
             <div class="summary-grid">
               <div><span>&#20135;&#21697;</span><strong id="taskProduct"></strong></div>
               <div><span>Item ID/SKU</span><strong id="taskSkus"></strong></div>
@@ -194,7 +259,7 @@
 
             <div class="workflow-actions">
             <button id="runAllBtn" class="primary" type="button">&#19968;&#38190;&#24320;&#22987;/&#32487;&#32493;&#33258;&#21160;&#27969;&#31243;</button>
-              <button id="copySourceDraftsBtn" type="button">&#22797;&#21046;1&#24215;&#21040;4-9&#33609;&#31295;&#31665;</button>
+              <button id="copySourceDraftsBtn" type="button">&#22797;&#21046;1&#24215;&#21040;&#30446;&#26631;&#24215;&#38138;</button>
             <button id="downloadTaskBtn" type="button">&#19979;&#36733;&#22270;&#29255;&#21253;</button>
             </div>
           </section>
@@ -239,6 +304,7 @@
               <button id="reloadImagesBtn" type="button">&#37325;&#26032;&#35835;&#21462;</button>
             </div>
           </div>
+          <div id="imageSlotProgress" aria-live="polite"></div>
           <div id="imageGrid" class="image-grid"></div>
           </section>
 

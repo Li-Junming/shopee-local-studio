@@ -20,7 +20,7 @@
   "jobs": [
     {
       "name": "PASTE_PRODUCT_ID_HERE",
-      "assetRoot": "C:/Users/12295/Documents/Codex/2026-07-16/ni/outputs/PASTE_PRODUCT_OUTPUT_FOLDER_HERE",
+      "assetRoot": "C:/ShopeeLocalStudio/ni/outputs/PASTE_PRODUCT_OUTPUT_FOLDER_HERE",
       "editUrl": "PASTE_BIGSELLER_EDIT_PAGE_URL_HERE"
     }
   ]

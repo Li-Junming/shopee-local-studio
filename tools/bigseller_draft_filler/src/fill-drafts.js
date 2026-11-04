@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { isCliEntrypoint, runCliWithCompletion } from "./cli-result.js";
+import { resolveChromeLaunchOptions } from "./browser-runtime.js";
 
-import { loadStoreAssets } from "./assets.js";
+import { loadStoreAssets, fingerprintAssets } from "./assets.js";
 import { loadConfig, parseArgs, printHelp } from "./config.js";
-import { identifyStore } from "./stores.js";
+import { identifyStore, storeMatchesText } from "./stores.js";
+import { selectCopyDialogStores, confirmCopyDialog, verifyCopiedDrafts } from "./copy-dialog.js";
+export { selectCopyDialogStores, waitForCopyDraftDialog } from "./copy-dialog.js";
 
 const TITLE_INPUT_INDEX = 0;
 const PRODUCT_IMAGE_SECTION_TITLE = "产品图";
@@ -13,6 +16,9 @@ const ADD_LOCAL_IMAGE_TEXT = "从本地添加";
 const DEFAULT_DRAFT_LIST_URL = "https://www.bigseller.pro/web/listing/shopee/index.htm?bsStatus=1";
 const DEFAULT_ACTIVE_LIST_URL = "https://www.bigseller.pro/web/listing/shopee/active/index.htm?bsStatus=4";
 const SOURCE_IMAGE_MANIFEST = "source-images.json";
+const DEFAULT_STORE_COOLDOWN_MS = 15000;
+const DEFAULT_SAVE_JOB_ATTEMPTS = 2;
+const DEFAULT_SAVE_RETRY_COOLDOWN_MS = 30000;
 const SEARCH_MODE_TRIGGER_SELECTOR = [
   "button",
   "a",
@@ -42,12 +48,18 @@ function normalizeSearchModeText(text) {
   return String(text ?? "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeSearchModeToken(text) {
+  return normalizeSearchModeText(text)
+    .replace(/[\s\p{P}\p{S}\uE000-\uF8FF]+/gu, "")
+    .toLowerCase();
+}
+
 export function isSkuSearchModeText(text) {
-  return /^sku$/i.test(normalizeSearchModeText(text));
+  return normalizeSearchModeToken(text) === "sku";
 }
 
 export function isItemIdSearchModeText(text) {
-  const normalized = normalizeSearchModeText(text).replace(/\s+/g, "").toLowerCase();
+  const normalized = normalizeSearchModeToken(text);
   return normalized === "itemid"
     || normalized === "\u5546\u54c1id"
     || normalized === "\u4ea7\u54c1id"
@@ -55,15 +67,15 @@ export function isItemIdSearchModeText(text) {
 }
 
 function isSearchModeCandidateText(text) {
-  const normalized = normalizeSearchModeText(text);
+  const normalized = normalizeSearchModeToken(text);
   return isSkuSearchModeText(normalized)
     || isItemIdSearchModeText(normalized)
-    || normalized === "\u4EA7\u54C1\u540D\u79F0"
-    || normalized === "\u5546\u54C1\u540D\u79F0"
+    || normalized === "\u4ea7\u54c1\u540d\u79f0"
+    || normalized === "\u5546\u54c1\u540d\u79f0"
     || normalized === "产品名称"
     || normalized === "商品名称"
-    || /^product name$/i.test(normalized)
-    || /^item name$/i.test(normalized);
+    || normalized === "productname"
+    || normalized === "itemname";
 }
 
 function searchModeOptionTextMatches(text, mode) {
@@ -97,6 +109,24 @@ export function chooseSearchModeTrigger(inputBox, candidates) {
   return ranked[0]?.candidate ?? null;
 }
 
+export function fallbackSearchModeTriggerBox(inputBox) {
+  if (!inputBox
+    || !Number.isFinite(inputBox.x)
+    || !Number.isFinite(inputBox.y)
+    || !Number.isFinite(inputBox.width)
+    || !Number.isFinite(inputBox.height)) {
+    return null;
+  }
+
+  const width = Math.round(Math.min(140, Math.max(80, inputBox.width * 0.28)) * 100) / 100;
+  return {
+    x: Math.round(Math.max(0, inputBox.x - width) * 100) / 100,
+    y: inputBox.y,
+    width,
+    height: inputBox.height
+  };
+}
+
 export function chooseSearchModeOption(triggerBox, options = [], mode = "SKU") {
   if (!triggerBox) return null;
   const ranked = options
@@ -115,21 +145,12 @@ export function normalizeSourceRowText(text) {
   return String(text || "").replace(/\s+/g, " ").trim().slice(0, 260);
 }
 
-function normalizeStoreText(value) {
-  return String(value ?? "")
-    .replace(/\s+/g, "")
-    .replace(/[()\uFF08\uFF09]/g, "")
-    .toLowerCase();
-}
-
 export function rowMatchesSkuAndStore(rowText, skus, storeMatch) {
   const text = String(rowText || "");
   const wantedSkus = (Array.isArray(skus) ? skus : [])
     .map((sku) => String(sku).trim())
     .filter(Boolean);
-  const wantedStore = normalizeStoreText(storeMatch);
-  return Boolean(wantedStore)
-    && normalizeStoreText(text).includes(wantedStore)
+  return storeMatchesText(text, storeMatch)
     && wantedSkus.some((sku) => text.includes(sku));
 }
 
@@ -137,7 +158,7 @@ export function buildCopyDraftPlan({ draftRowTexts = [], skus = [], storeMap = [
   const targets = [];
   const skipped = [];
   for (const store of storeMap) {
-    const exists = draftRowTexts.some((rowText) => rowMatchesSkuAndStore(rowText, skus, store.match));
+    const exists = draftRowTexts.some((rowText) => rowMatchesSkuAndStore(rowText, skus, store));
     if (exists) skipped.push(store);
     else targets.push(store);
   }
@@ -145,14 +166,21 @@ export function buildCopyDraftPlan({ draftRowTexts = [], skus = [], storeMap = [
 }
 
 export function chooseCopyToDraftControl(controls = [], rowBox = null) {
-  const rowRightFallbackX = rowBox ? rowBox.x + rowBox.width * 0.72 : Number.POSITIVE_INFINITY;
+  const rowRightFallbackX = rowBox ? rowBox.x + rowBox.width * 0.85 : Number.POSITIVE_INFINITY;
   const scored = controls
     .map((control) => {
       const text = [control.text, control.aria, control.title].filter(Boolean).join(" ");
       const className = String(control.className || "");
       const centerX = control.box ? control.box.x + control.box.width / 2 : 0;
+      const draftAction = /复制.*(?:草稿|draft)|copy.*draft|clone.*draft/i.test(text);
+      const actionArea = centerX >= rowRightFallbackX || /action[_-]btn|product[_-]action/i.test(className);
+      // SKU/Item-ID/URL clipboard controls also say "copy", especially on the
+      // sold-out list. A generic copy icon is not proof of a draft action.
+      if (control.visible === false || control.disabled || /复制.*(?:SKU|Item\s*ID|链接)|copy.*(?:sku|item\s*id|url|link)/i.test(text)
+        || /sku[_-]?copy|copy[_-]?sku|clipboard/i.test(className)
+        || (!draftAction && !actionArea)) return { control, score: 0, centerX };
       let score = 0;
-      if (/\u590D\u5236.*(\u8349\u7A3F|draft)|copy.*draft|clone.*draft/i.test(text)) score += 100;
+      if (draftAction) score += 100;
       if (/\u590D\u5236|copy|clone/i.test(text)) score += 80;
       if (/\b(copy|clone)\b|copy-/i.test(className) && centerX >= rowRightFallbackX) score += 30;
       if (/\bsku\b|sku-/i.test(className) && !text) score -= 40;
@@ -228,12 +256,26 @@ export async function openEditPageWithRetry(context, editUrl, { maxAttempts = 2,
       return { page, pageText, attempt };
     } catch (error) {
       lastError = error;
-      if (attempt >= maxAttempts || !isHiddenBodyTimeout(error)) throw error;
       await page.close().catch(() => {});
+      if (attempt >= maxAttempts || !isHiddenBodyTimeout(error)) throw error;
       logger.log(`[open] Page body stayed hidden; retrying edit page (${attempt + 1}/${maxAttempts}).`);
     }
   }
   throw lastError;
+}
+
+export function resolveEditUrlCandidate(candidate, baseUrl) {
+  const value = String(candidate ?? "").trim();
+  if (!value || value === "#" || /^javascript:/i.test(value)) return "";
+
+  try {
+    const url = new URL(value, baseUrl);
+    if (!/^https?:$/.test(url.protocol)) return "";
+    if (!/\/(?:web\/)?listing\/shopee\/(?:active\/)?edit\//i.test(url.pathname)) return "";
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 export async function fillTitleAndDetail(page, assets) {
@@ -343,51 +385,240 @@ async function clearExistingProductImages(page) {
   }
 
   console.log("[images] Cleared old product images.");
+  await page.waitForTimeout(2000);
 }
 
-async function uploadProductImages(page, imagePaths) {
+async function uploadProductImages(page, imagePaths, options = {}) {
+  const maxAttempts = Math.max(1, Number(options.maxAttempts) || 2);
+  const timeoutMs = Math.max(10000, Number(options.timeoutMs) || 60000);
   let uploaded = await productImageCount(page);
   for (const imagePath of imagePaths) {
-    await uploadSingleProductImage(page, imagePath, uploaded + 1);
+    const expectedCount = uploaded + 1;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await uploadSingleProductImage(page, imagePath, expectedCount, timeoutMs);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        await page.waitForTimeout(2000);
+        const currentCount = await productImageCount(page).catch(() => uploaded);
+        if (currentCount >= expectedCount) {
+          lastError = null;
+          break;
+        }
+        const notices = await page.evaluate(() => {
+          const visible = (element) => {
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+          };
+          return [...document.querySelectorAll(".ant-message, .ant-notification, .el-message, .el-notification, [role='alert'], .ant-modal, .el-dialog")]
+            .filter(visible)
+            .map((element) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim())
+            .filter(Boolean)
+            .slice(0, 8);
+        }).catch(() => []);
+        if (notices.length) {
+          console.log(`[images] Upload page notices: ${notices.join(" | ")}`);
+        }
+        if (attempt === 1) {
+          const screenshotPath = path.join(process.env.TEMP || process.cwd(), "bigseller-upload-timeout.png");
+          await page.screenshot({ path: screenshotPath, fullPage: true }).catch(() => {});
+          console.log(`[images] Upload failure screenshot: ${screenshotPath}`);
+        }
+        if (isNonRetryableBigSellerError(error)) throw error;
+        if (attempt < maxAttempts) {
+          console.log(`[images] Upload retry ${attempt}/${maxAttempts - 1} for ${path.basename(imagePath)} after: ${String(error?.message || error).split("\n")[0]}`);
+          await page.keyboard.press("Escape").catch(() => {});
+        }
+      }
+    }
+    if (lastError) throw lastError;
     uploaded = await productImageCount(page);
+    await page.waitForTimeout(1500);
   }
   console.log(`[images] Uploaded ${imagePaths.length} product images.`);
 }
 
-async function uploadSingleProductImage(page, imagePath, expectedCount) {
+export function saveProgressPath(configPath) {
+  return `${path.resolve(configPath)}.save-progress.json`;
+}
+
+export function jobProgressKey(job) {
+  return String(job?.editUrl || job?.name || "").trim();
+}
+
+export function completedSaveJobKeys(progress = {}, requiredVerificationVersion = 0) {
+  return new Set((Array.isArray(progress.completedJobs) ? progress.completedJobs : [])
+    .filter((entry) => !requiredVerificationVersion || Number(entry?.verificationVersion || 0) >= requiredVerificationVersion)
+    .map((entry) => typeof entry === "string" ? entry : entry?.key || entry?.editUrl)
+    .map((value) => String(value || "").trim())
+    .filter(Boolean));
+}
+
+export function pendingSaveJobs(jobs = [], progress = {}, requiredVerificationVersion = 0, signatures = null) {
+  const completed = completedSaveJobKeys(progress, requiredVerificationVersion);
+  return jobs.filter((job) => {
+    const jobKey = jobProgressKey(job);
+    if (!completed.has(jobKey)) return true;
+    return signatures && !(progress.completedJobs || []).some(entry => entry?.key === jobKey && entry?.assetSignature === signatures[jobKey]);
+  });
+}
+
+export function bigSellerUploadBlockReason(payload = {}) {
+  const message = String(payload?.msg || payload?.message || "").trim();
+  if (Number(payload?.code) !== 0 && message) return message;
+  if (Number(payload?.data?.hasImageSpace) === 0) {
+    const used = payload?.data?.usedSizeStr;
+    const allowed = payload?.data?.allowSizeStr;
+    const sizeHint = used != null && allowed != null ? `（已用 ${used} MB / 额度 ${allowed} MB）` : "";
+    return `BigSeller 素材中心空间不足${sizeHint}`;
+  }
+  return "";
+}
+
+export function isNonRetryableBigSellerError(error) {
+  return /BigSeller blocked image upload|素材中心空间不足/i.test(String(error?.message || error || ""));
+}
+
+async function loadSaveProgress(configPath) {
+  const progressPath = saveProgressPath(configPath);
+  try {
+    return JSON.parse(await readFile(progressPath, "utf8"));
+  } catch (error) {
+    if (error?.code === "ENOENT") return { version: 1, completedJobs: [] };
+    throw new Error(`Could not read save progress ${progressPath}: ${error.message}`);
+  }
+}
+
+async function recordCompletedSaveJob(configPath, progress, job, verification = {}) {
+  const key = jobProgressKey(job);
+  const completedJobs = (Array.isArray(progress.completedJobs) ? progress.completedJobs : [])
+    .filter((entry) => (typeof entry === 'string' ? entry : entry.key || entry.editUrl) !== key);
+  if (!completedSaveJobKeys({ completedJobs }).has(key)) {
+    completedJobs.push({
+      key,
+      name: job.name ?? "",
+      editUrl: job.editUrl ?? "",
+      savedAt: new Date().toISOString(),
+      ...verification
+    });
+  }
+  progress.version = 1;
+  progress.completedJobs = completedJobs;
+  progress.updatedAt = new Date().toISOString();
+  const progressPath = saveProgressPath(configPath);
+  await writeFile(progressPath, `${JSON.stringify(progress, null, 2)}\n`, "utf8");
+  console.log(`[progress] Saved checkpoint: ${job.name ?? key}`);
+}
+
+async function uploadSingleProductImage(page, imagePath, expectedCount, timeoutMs = 60000) {
   const section = productImageSection(page);
+  const networkEvents = [];
+  const networkDetailPromises = [];
+  let resolveUploadBlock;
+  const uploadBlockPromise = new Promise((resolve) => {
+    resolveUploadBlock = resolve;
+  });
+  const pushNetworkEvent = (value) => {
+    if (networkEvents.length < 12) networkEvents.push(value);
+  };
+  const safeRequestPath = (rawUrl) => {
+    try {
+      const url = new URL(rawUrl);
+      return `${url.hostname}${url.pathname}`;
+    } catch {
+      return "(invalid upload URL)";
+    }
+  };
+  const safeStatusFields = (value, prefix = "", output = []) => {
+    if (!value || typeof value !== "object" || output.length >= 16) return output;
+    for (const [key, child] of Object.entries(value)) {
+      if (output.length >= 16) break;
+      const field = prefix ? `${prefix}.${key}` : key;
+      if (child && typeof child === "object") {
+        safeStatusFields(child, field, output);
+      } else if (/code|success|message|msg|space|capacity|size|count|limit|used|remain|available|total/i.test(key)) {
+        output.push(`${field}=${String(child).slice(0, 160)}`);
+      }
+    }
+    return output;
+  };
+  const onResponse = (response) => {
+    const request = response.request();
+    const method = request.method().toUpperCase();
+    if (["POST", "PUT", "PATCH"].includes(method) || response.status() >= 400) {
+      pushNetworkEvent(`${method} ${response.status()} ${safeRequestPath(response.url())}`);
+    }
+    if (/\/api\/v1\/image\/(?:getUploadInfoAndCheckSpace|getAlbumUserSummary)\.json/i.test(response.url())) {
+      networkDetailPromises.push(response.json()
+        .then((body) => {
+          const fields = safeStatusFields(body);
+          if (fields.length) pushNetworkEvent(`DETAIL ${safeRequestPath(response.url())}: ${fields.join(", ")}`);
+          const reason = bigSellerUploadBlockReason(body);
+          if (reason) resolveUploadBlock(reason);
+        })
+        .catch(() => {}));
+    }
+  };
+  const onRequestFailed = (request) => {
+    const method = request.method().toUpperCase();
+    if (["POST", "PUT", "PATCH"].includes(method)) {
+      pushNetworkEvent(`${method} FAILED ${safeRequestPath(request.url())}: ${request.failure()?.errorText || "unknown"}`);
+    }
+  };
+  page.on("response", onResponse);
+  page.on("requestfailed", onRequestFailed);
 
-  const chooseButtons = section.locator('[autoid="select_images_button"]');
-  const chooseButtonCount = await chooseButtons.count();
-  if (chooseButtonCount === 0) {
-    throw new Error("Could not find the product image selection button.");
+  try {
+    const chooseButtons = section.locator('[autoid="select_images_button"]');
+    const chooseButtonCount = await chooseButtons.count();
+    if (chooseButtonCount === 0) {
+      throw new Error("Could not find the product image selection button.");
+    }
+
+    await chooseButtons.first().click({ timeout: 10000 });
+
+    const localOptions = page.getByText(ADD_LOCAL_IMAGE_TEXT, { exact: true });
+    const localOptionCount = await localOptions.count();
+    if (localOptionCount === 0) {
+      throw new Error(`Could not find the "${ADD_LOCAL_IMAGE_TEXT}" image upload option.`);
+    }
+
+    const fileChooserPromise = page.waitForEvent("filechooser", { timeout: 15000 });
+    await localOptions.first().click({ timeout: 10000 });
+    const fileChooser = await fileChooserPromise;
+    await fileChooser.setFiles([imagePath], { timeout: 60000 });
+    await Promise.race([
+      page.waitForFunction(
+        ({ sectionTitle, expected }) => {
+          const sections = [...document.querySelectorAll(".page_edit_item")];
+          const section = sections.find((candidate) => {
+            const title = candidate.querySelector(".title");
+            return title?.textContent?.includes(sectionTitle);
+          });
+          const count = section?.querySelectorAll(".page_edit_img_item.imgItem").length ?? 0;
+          return count >= expected;
+        },
+        { sectionTitle: PRODUCT_IMAGE_SECTION_TITLE, expected: expectedCount },
+        { timeout: timeoutMs }
+      ),
+      uploadBlockPromise.then((reason) => {
+        throw new Error(`BigSeller blocked image upload: ${reason}`);
+      })
+    ]);
+  } catch (error) {
+    await Promise.allSettled(networkDetailPromises);
+    const networkSummary = networkEvents.length
+      ? networkEvents.join(" | ")
+      : "no POST/PUT/PATCH upload request or error response observed";
+    throw new Error(`${error.message}\nUpload network: ${networkSummary}`);
+  } finally {
+    page.off("response", onResponse);
+    page.off("requestfailed", onRequestFailed);
   }
-
-  await chooseButtons.first().click({ timeout: 10000 });
-
-  const localOptions = page.getByText(ADD_LOCAL_IMAGE_TEXT, { exact: true });
-  const localOptionCount = await localOptions.count();
-  if (localOptionCount === 0) {
-    throw new Error(`Could not find the "${ADD_LOCAL_IMAGE_TEXT}" image upload option.`);
-  }
-
-  const fileChooserPromise = page.waitForEvent("filechooser", { timeout: 15000 });
-  await localOptions.first().click({ timeout: 10000 });
-  const fileChooser = await fileChooserPromise;
-  await fileChooser.setFiles([imagePath], { timeout: 60000 });
-  await page.waitForFunction(
-    ({ sectionTitle, expected }) => {
-      const sections = [...document.querySelectorAll(".page_edit_item")];
-      const section = sections.find((candidate) => {
-        const title = candidate.querySelector(".title");
-        return title?.textContent?.includes(sectionTitle);
-      });
-      const count = section?.querySelectorAll(".page_edit_img_item.imgItem").length ?? 0;
-      return count >= expected;
-    },
-    { sectionTitle: PRODUCT_IMAGE_SECTION_TITLE, expected: expectedCount },
-    { timeout: 120000 }
-  );
 }
 
 async function clickWhiteSaveButton(page) {
@@ -467,37 +698,42 @@ async function waitForLogin(context, targetUrl) {
   throw new Error("Timed out waiting for BigSeller login.");
 }
 
-function buildDiscoveredOutputConfig(config, jobs) {
+export function buildDiscoveredOutputConfig(config, jobs) {
   return {
     browser: config.browser,
     storeMap: config.storeMap,
+    verifySavedText: config.verifySavedText,
+    verifySavedImages: config.verifySavedImages,
+    requiredImageCount: config.requiredImageCount,
+    requiredSaveVerificationVersion: config.requiredSaveVerificationVersion,
+    storeCooldownMs: config.storeCooldownMs,
+    saveJobAttempts: config.saveJobAttempts,
     jobs
   };
 }
 
-async function findDraftRowIndex(page, skus, storeMatch) {
-  return page.evaluate(
-    ({ skus: targetSkus, storeMatch: targetStore }) => {
-      const normalizeStore = (value) => String(value ?? "")
-        .replace(/\s+/g, "")
-        .replace(/[()]/g, "（")
-        .toLowerCase();
-      const wantedStore = normalizeStore(targetStore);
-      const wantedSkus = targetSkus.map((sku) => String(sku).trim()).filter(Boolean);
-      const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
-      const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
-        .filter((row) => row.innerText && row.querySelector("td, [role='cell'], img, a"));
-      const rows = primaryRows.length ? primaryRows : fallbackRows;
+export async function findDraftRowIndex(page, skus, storeMatch) {
+  const rows = await productRowTexts(page);
+  return rows.findIndex((text) => rowMatchesSkuAndStore(text, skus, storeMatch));
+}
 
-      return rows.findIndex((row) => {
-        const rowText = row.innerText || "";
-        const rowStoreMatched = normalizeStore(rowText).includes(wantedStore);
-        const skuMatched = wantedSkus.some((sku) => rowText.includes(sku));
-        return rowStoreMatched && skuMatched;
-      });
-    },
-    { skus, storeMatch }
-  );
+async function neutralizeBigSellerFeedbackPanel(page) {
+  return page.evaluate(() => {
+    const promptText = "目前的功能是否已经满足您的需求";
+    const visible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    };
+    const panel = [...document.querySelectorAll(".right_nav_menu")]
+      .find((element) => visible(element) && (element.innerText || element.textContent || "").includes(promptText));
+    if (!panel) return false;
+
+    for (const element of [panel, ...panel.querySelectorAll("*")]) {
+      element.style.setProperty("pointer-events", "none", "important");
+    }
+    return true;
+  }).catch(() => false);
 }
 
 async function openEditUrlFromRow(context, listPage, rowIndex, returnUrl = DEFAULT_DRAFT_LIST_URL) {
@@ -509,56 +745,68 @@ async function openEditUrlFromRow(context, listPage, rowIndex, returnUrl = DEFAU
   const editButtonCount = await editButton.count();
   if (editButtonCount === 0) throw new Error(`Could not find edit button in draft row index ${rowIndex}.`);
 
+  const rawHref = await editButton.getAttribute("href").catch(() => "");
+  const directUrl = resolveEditUrlCandidate(rawHref, listPage.url());
+  if (directUrl) return directUrl;
+  console.log(`[source] Edit action href was not directly usable: ${rawHref || "(empty)"}`);
+
   await editButton.scrollIntoViewIfNeeded({ timeout: 10000 });
+  const feedbackPanelNeutralized = await neutralizeBigSellerFeedbackPanel(listPage);
+  if (feedbackPanelNeutralized) {
+    console.log("[source] Neutralized the BigSeller feedback panel before opening the matched edit action.");
+  }
   const newPagePromise = context.waitForEvent("page", { timeout: 10000 }).catch(() => null);
-  const samePagePromise = listPage.waitForURL(/\/web\/listing\/shopee\/edit\//, { timeout: 15000 }).catch(() => null);
+  const samePagePromise = listPage.waitForURL(/\/(?:web\/)?listing\/shopee\/(?:active\/)?edit\//, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
   await editButton.click({ timeout: 10000 });
 
   const newPage = await newPagePromise;
   if (newPage) {
+    await newPage.waitForURL(/\/(?:web\/)?listing\/shopee\/(?:active\/)?edit\//, { timeout: 15000 }).catch(() => {});
     await newPage.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
-    const editUrl = newPage.url();
-    await newPage.close();
-    return editUrl;
+    const editUrl = resolveEditUrlCandidate(newPage.url(), listPage.url());
+    if (!editUrl) console.log(`[source] New edit window URL was not recognized: ${newPage.url() || "(empty)"}`);
+    await newPage.close().catch(() => {});
+    if (editUrl) return editUrl;
   }
 
-  const samePage = await samePagePromise;
-  if (samePage) {
-    const editUrl = listPage.url();
+  if (await samePagePromise) {
+    const editUrl = resolveEditUrlCandidate(listPage.url(), returnUrl);
+    if (!editUrl) console.log(`[source] Same-page edit URL was not recognized: ${listPage.url() || "(empty)"}`);
     await listPage.goto(returnUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     await listPage.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    if (editUrl) return editUrl;
+  }
+
+  const missedEditPage = context.pages().find((page) => (
+    page !== listPage && Boolean(resolveEditUrlCandidate(page.url(), listPage.url()))
+  ));
+  if (missedEditPage) {
+    const editUrl = resolveEditUrlCandidate(missedEditPage.url(), listPage.url());
+    console.log(`[source] Recovered edit URL from an already-opened BigSeller page: ${editUrl}`);
+    await missedEditPage.close().catch(() => {});
     return editUrl;
   }
 
-  throw new Error(`Clicking draft row index ${rowIndex} did not open an edit page.`);
+  throw new Error(`Clicking draft row index ${rowIndex} did not produce a valid BigSeller edit URL.`);
 }
 
-async function findSourceRowIndex(page, skus, sourceStoreMatch) {
-  return page.evaluate(
-    ({ skus: targetSkus, storeMatch: targetStore }) => {
-      const normalizeStore = (value) => String(value ?? "")
-        .replace(/\s+/g, "")
-        .replace(/[()（）]/g, "")
-        .toLowerCase();
-      const wantedStore = normalizeStore(targetStore);
-      const wantedSkus = targetSkus.map((sku) => String(sku).trim()).filter(Boolean);
-      const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
-      const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
-        .filter((row) => {
-          const rowText = row.innerText || "";
-          return rowText.trim() && row.querySelector("td, [role='cell'], img, a");
-        });
-      const rows = primaryRows.length ? primaryRows : fallbackRows;
+export async function findSourceRowIndex(page, skus, sourceStoreMatch) {
+  const rows = await productRowTexts(page);
+  return rows.findIndex((text) => sourceStoreMatch
+    ? rowMatchesSkuAndStore(text, skus, sourceStoreMatch)
+    : skus.some((sku) => text.includes(String(sku))));
+}
 
-      return rows.findIndex((row) => {
-        const rowText = row.innerText || "";
-        const rowStoreMatched = !wantedStore || normalizeStore(rowText).includes(wantedStore);
-        const skuMatched = wantedSkus.some((sku) => rowText.includes(sku));
-        return rowStoreMatched && skuMatched;
-      });
-    },
-    { skus, storeMatch: sourceStoreMatch }
-  );
+async function productRowTexts(page) {
+  return page.evaluate(() => {
+    const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
+    const fallbackRows = [...document.querySelectorAll("tbody tr, [role=\'row\']")]
+      .filter((row) => (row.innerText || "").trim() && row.querySelector("td, [role=\'cell\'], img, a"));
+    const rows = primaryRows.length ? primaryRows : fallbackRows;
+    return rows.map((row) => row.innerText || "");
+  });
 }
 
 async function waitForSkuRowOnCurrentPage(page, skus, sourceStoreMatch, timeoutMs = 12000) {
@@ -662,20 +910,13 @@ async function searchSourceRowBySkuGroup(page, listUrl, skus, sourceStoreMatch, 
   return -1;
 }
 
-async function clickCopyToDraftFromRow(page, rowIndex) {
+export async function clickCopyToDraftFromRow(page, rowIndex) {
   const snapshot = await page.evaluate(({ rowIndex: targetIndex }) => {
     const visible = (element) => {
       const rect = element.getBoundingClientRect();
       const style = window.getComputedStyle(element);
       return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
     };
-    const textOf = (element) => [
-      element.innerText,
-      element.textContent,
-      element.getAttribute("aria-label"),
-      element.getAttribute("title"),
-      element.getAttribute("class")
-    ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
     const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
     const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
       .filter((row) => (row.innerText || "").trim() && row.querySelector("td, [role='cell'], img, a"));
@@ -685,6 +926,8 @@ async function clickCopyToDraftFromRow(page, rowIndex) {
     const candidates = [...row.querySelectorAll("button, a, i, span, svg, [role='button']")];
     const rowRect = row.getBoundingClientRect();
     return {
+      rowSelector: primaryRows.length ? "tr.product_native_row" : "tbody tr, [role='row']",
+      rowLocatorIndex: primaryRows.length ? targetIndex : [...document.querySelectorAll("tbody tr, [role='row']")].indexOf(row),
       rowBox: { x: rowRect.x, y: rowRect.y, width: rowRect.width, height: rowRect.height },
       controls: candidates
         .map((element, index) => {
@@ -693,8 +936,9 @@ async function clickCopyToDraftFromRow(page, rowIndex) {
             index,
             text: (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim(),
             aria: element.getAttribute("aria-label") || "",
-            title: element.getAttribute("title") || "",
+            title: element.getAttribute("title") || element.getAttribute("data-original-title") || element.getAttribute("data-title") || "",
             className: element.getAttribute("class") || "",
+            disabled: Boolean(element.disabled) || element.getAttribute("aria-disabled") === "true",
             visible: visible(element),
             box: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
           };
@@ -705,160 +949,23 @@ async function clickCopyToDraftFromRow(page, rowIndex) {
 
   const copyControl = chooseCopyToDraftControl(snapshot?.controls ?? [], snapshot?.rowBox ?? null);
   if (!copyControl) {
-    throw new Error(`Could not find copy-to-draft action in source row index ${rowIndex}.`);
+    throw new Error(`Could not find a safe copy-to-draft action in source row index ${rowIndex}; SKU/Item ID clipboard controls are excluded. No copy was submitted.`);
   }
 
-  const clicked = await page.evaluate(({ rowIndex: targetIndex, controlIndex }) => {
-    const primaryRows = [...document.querySelectorAll("tr.product_native_row")];
-    const fallbackRows = [...document.querySelectorAll("tbody tr, [role='row']")]
-      .filter((row) => (row.innerText || "").trim() && row.querySelector("td, [role='cell'], img, a"));
-    const rows = primaryRows.length ? primaryRows : fallbackRows;
-    const row = rows[targetIndex];
-    const candidates = row ? [...row.querySelectorAll("button, a, i, span, svg, [role='button']")] : [];
-    const element = candidates[controlIndex];
-    if (!element) return false;
-    element.click();
-    return true;
-  }, { rowIndex, controlIndex: copyControl.index });
-
-  if (!clicked) {
-    throw new Error(`Could not click copy-to-draft action in source row index ${rowIndex}.`);
-  }
-
-  await page.waitForTimeout(800);
+  const control = page.locator(snapshot.rowSelector).nth(snapshot.rowLocatorIndex)
+    .locator("button, a, i, span, svg, [role='button']").nth(copyControl.index);
+  const feedbackPanelNeutralized = await neutralizeBigSellerFeedbackPanel(page);
+  if (feedbackPanelNeutralized) console.log("[copy] Neutralized the known BigSeller feedback panel.");
+  console.log(`[copy] Opening row ${rowIndex} draft action: ${String(copyControl.title || copyControl.aria || copyControl.text || copyControl.className).slice(0, 120)}`);
+  await control.scrollIntoViewIfNeeded({ timeout: 10000 });
+  // A real click checks visibility, overlays and hit-testing instead of silently
+  // dispatching a JS click on a stale/covered icon. Never force or double-click.
+  await control.click({ timeout: 10000 });
 }
 
-async function selectCopyDialogStores(page, storeMap) {
-  const dialog = page.locator(".ant-modal, .el-dialog, [role='dialog'], .modal").filter({ hasText: "Shopee" }).last();
-  if (await dialog.count() === 0) {
-    throw new Error("Could not find the copy-to-Shopee-draft dialog.");
-  }
-  await dialog.waitFor({ state: "visible", timeout: 10000 });
 
-  const selected = [];
-  const missing = [];
-  for (const target of storeMap) {
-    const box = await page.evaluate(({ storeText }) => {
-      const normalize = (value) => String(value ?? "")
-        .replace(/\s+/g, "")
-        .replace(/[()\uFF08\uFF09]/g, "")
-        .toLowerCase();
-      const visible = (element) => {
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-      };
-      const dialogs = [...document.querySelectorAll(".ant-modal, .el-dialog, [role='dialog'], .modal")]
-        .filter((candidate) => visible(candidate) && (candidate.innerText || "").includes("Shopee"));
-      const modal = dialogs[dialogs.length - 1];
-      if (!modal) return null;
-      const wanted = normalize(storeText);
-      const candidates = [...modal.querySelectorAll("label, .ant-checkbox-wrapper, .el-checkbox, [role='checkbox'], li, div, span")]
-        .filter((element) => visible(element) && normalize(element.innerText || element.textContent).includes(wanted))
-        .map((element) => {
-          let clickable = element;
-          let checkbox = null;
-          for (let cursor = element, depth = 0; cursor && cursor !== modal && depth < 5; cursor = cursor.parentElement, depth += 1) {
-            const rect = cursor.getBoundingClientRect();
-            const candidateCheckbox = cursor.matches?.(".ant-checkbox, .el-checkbox__input, input[type='checkbox'], [role='checkbox']")
-              ? cursor
-              : cursor.querySelector?.("input[type='checkbox'], .ant-checkbox, .el-checkbox__input, [role='checkbox']");
-            if (candidateCheckbox && rect.height <= 60 && rect.width <= 360) {
-              clickable = cursor;
-              checkbox = candidateCheckbox;
-              break;
-            }
-          }
-          const rect = (checkbox || clickable).getBoundingClientRect();
-          const className = String((checkbox || clickable).className || "");
-          const hasCheckbox = Boolean(checkbox)
-            || (checkbox || clickable).getAttribute("role") === "checkbox"
-            || /checkbox/i.test(className);
-          const checkedElement = checkbox || clickable;
-          const input = checkedElement.matches?.("input[type='checkbox']")
-            ? checkedElement
-            : checkedElement.querySelector?.("input[type='checkbox']");
-          const checked = input
-            ? input.checked
-            : checkedElement.getAttribute("aria-checked") === "true" || /checked|selected/i.test(String(checkedElement.className || ""));
-          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height, area: rect.width * rect.height, hasCheckbox, checked };
-        })
-        .filter((candidate) => candidate.width > 0 && candidate.height > 0)
-        .sort((a, b) => Number(b.hasCheckbox) - Number(a.hasCheckbox) || a.area - b.area);
-      return candidates[0] ?? null;
-    }, { storeText: target.match });
-    if (!box) {
-      missing.push(target.match);
-      continue;
-    }
-    if (!box.checked) {
-      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-      await page.waitForTimeout(150);
-    }
-    selected.push(target.match);
-  }
-
-  if (missing.length) {
-    throw new Error(`Could not find target stores in copy dialog: ${missing.join(", ")}`);
-  }
-  return selected;
-}
-
-async function confirmCopyDialog(page) {
-  const dialog = page.locator(".ant-modal, .el-dialog, [role='dialog'], .modal").filter({ hasText: "Shopee" }).last();
-  const buttons = dialog.locator("button, [role='button']");
-  const count = await buttons.count();
-  let clicked = false;
-  for (let index = 0; index < count; index += 1) {
-    const button = buttons.nth(index);
-    const text = (await button.innerText().catch(() => "")).replace(/\s+/g, "");
-    const className = await button.getAttribute("class").catch(() => "");
-    const disabled = await button.isDisabled().catch(() => false);
-    if (!disabled && (text === "\u786E\u5B9A" || /^ok$/i.test(text) || String(className || "").includes("primary"))) {
-      await button.click({ timeout: 5000 });
-      clicked = true;
-      break;
-    }
-  }
-
-  if (!clicked) {
-    throw new Error("Could not find the confirm button in the copy dialog.");
-  }
-  await page.waitForTimeout(8000);
-  const notices = await page.evaluate(() => {
-    const visible = (element) => {
-      const rect = element.getBoundingClientRect();
-      const style = window.getComputedStyle(element);
-      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-    };
-    return [...document.querySelectorAll(".ant-message, .ant-notification, .el-message, .el-notification, [role='alert'], .ant-modal, .el-dialog")]
-      .filter(visible)
-      .map((element) => (element.innerText || element.textContent || "").replace(/\s+/g, " ").trim())
-      .filter(Boolean)
-      .slice(0, 5);
-  }).catch(() => []);
-  if (notices.length) {
-    console.log(`[copy] Notices after confirm: ${notices.join(" | ")}`);
-  }
-  const successResult = notices.some((notice) => /\u64CD\u4F5C\u6210\u529F[:：]?\s*[1-9]/.test(notice) && /\u64CD\u4F5C\u5931\u8D25[:：]?\s*0/.test(notice));
-  if (successResult) {
-    return;
-  }
-  const stillOpen = await dialog.isVisible().catch(() => false);
-  if (stillOpen) {
-    await page.screenshot({ path: path.join(process.env.TEMP || process.cwd(), "bigseller-copy-dialog-still-open.png"), fullPage: true }).catch(() => {});
-    throw new Error("Copy-to-Shopee-draft dialog stayed open after clicking confirm.");
-  }
-}
-
-async function searchVisibleInputs(page, value, { mode = "SKU", matchValues = [value] } = {}) {
-  await page.evaluate(() => {
-    window.scrollTo(0, 0);
-    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
-  }).catch(() => {});
-  await page.waitForTimeout(500);
-
-  const inputIndexes = await page.evaluate(() => {
+async function visibleSearchInputIndexes(page) {
+  return page.evaluate(() => {
     const visible = (element) => {
       const rect = element.getBoundingClientRect();
       const style = window.getComputedStyle(element);
@@ -903,12 +1010,25 @@ async function searchVisibleInputs(page, value, { mode = "SKU", matchValues = [v
       .slice(0, 20)
       .map((item) => item.index);
   });
+}
+
+async function searchVisibleInputs(page, value, { mode = "SKU", matchValues = [value] } = {}) {
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  }).catch(() => {});
+  await page.waitForTimeout(500);
+
+  const inputIndexes = await visibleSearchInputIndexes(page);
   console.log(`[source] Visible input candidates: ${inputIndexes.length}.`);
 
-  for (const index of inputIndexes) {
+  for (const initialIndex of inputIndexes) {
+    await ensureSearchMode(page, initialIndex, mode);
+    await page.waitForTimeout(400);
+    const refreshedIndexes = await visibleSearchInputIndexes(page).catch(() => []);
+    const index = refreshedIndexes[0] ?? initialIndex;
     const input = page.locator("input, textarea, [contenteditable='true']").nth(index);
     await input.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-    await ensureSearchMode(page, index, mode);
     await input.click({ timeout: 5000 }).catch(() => {});
     await input.fill("", { timeout: 5000 }).catch(async () => {
       await page.keyboard.press("Control+A").catch(() => {});
@@ -978,17 +1098,28 @@ async function ensureSearchMode(page, inputIndex, mode) {
   }, { inputIndex, selector: SEARCH_MODE_TRIGGER_SELECTOR }).catch(() => null);
 
   const trigger = chooseSearchModeTrigger(layout?.inputBox, layout?.candidates ?? []);
-  if (!trigger) return false;
-  if (searchModeTextMatches(trigger.text, mode)) return true;
+  if (trigger && searchModeTextMatches(trigger.text, mode)) return true;
 
-  console.log(`[source] Switching search type "${trigger.text}" to ${mode}.`);
-  const clicked = await page.locator(SEARCH_MODE_TRIGGER_SELECTOR).nth(trigger.index).click({ timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
+  const triggerBox = trigger?.box ?? fallbackSearchModeTriggerBox(layout?.inputBox);
+  if (!triggerBox) return false;
+
+  let clicked;
+  if (trigger) {
+    console.log(`[source] Switching search type "${trigger.text}" to ${mode}.`);
+    clicked = await page.locator(SEARCH_MODE_TRIGGER_SELECTOR).nth(trigger.index).click({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+  } else {
+    console.log(`[source] Switching search type by position to ${mode}.`);
+    clicked = await page.mouse.click(
+      triggerBox.x + (triggerBox.width / 2),
+      triggerBox.y + (triggerBox.height / 2)
+    ).then(() => true).catch(() => false);
+  }
   if (!clicked) return false;
 
   await page.waitForTimeout(300);
-  return clickNearestSearchModeOption(page, trigger.box, mode);
+  return clickNearestSearchModeOption(page, triggerBox, mode);
 }
 
 async function clickNearestSkuOption(page, triggerBox) {
@@ -1275,9 +1406,19 @@ async function copySourceProductsToDrafts(context, config) {
     console.log(`[copy] Source row: ${sourceRowText}`);
     await clickCopyToDraftFromRow(activePage, sourceRowIndex);
     const selected = await selectCopyDialogStores(activePage, plan.targets);
-    console.log(`[copy] Selected target stores: ${selected.join(", ")}`);
-    await confirmCopyDialog(activePage);
-    console.log(`[copy] Submitted copy to ${selected.length} target store(s).`);
+    console.log(`[copy] Verified checked target stores: ${selected.join(", ")}`);
+    const outcome = await confirmCopyDialog(activePage, plan.targets);
+    console.log(`[copy] Submitted once; result signal: ${outcome.status}. Checking actual target drafts.`);
+    const verified = await verifyCopiedDrafts({
+      stores: plan.targets,
+      readRows: async () => {
+        await searchSourceRowBySkuGroup(draftPage, draftListUrl, product.skus, "");
+        return visibleProductRowTexts(draftPage);
+      },
+      matches: (row, store) => rowMatchesSkuAndStore(row, product.skus, store),
+      pause: () => draftPage.waitForTimeout(1000)
+    });
+    console.log(`[copy] Verified existing target drafts for SKU [${product.skus.join(", ")}]: ${verified.join(", ")}`);
   }
 }
 
@@ -1303,7 +1444,7 @@ async function discoverJobsFromSkuGroups(context, config, outPath) {
     await searchSourceRowBySkuGroup(listPage, listUrl, product.skus, "");
 
     for (const store of config.storeMap) {
-      const rowIndex = await findDraftRowIndex(listPage, product.skus, store.match);
+      const rowIndex = await findDraftRowIndex(listPage, product.skus, store);
       if (rowIndex < 0) {
         throw new Error(`No draft row matched SKU group [${product.skus.join(", ")}] for store "${store.match}".`);
       }
@@ -1328,37 +1469,104 @@ async function processJob(context, config, job, mode) {
   const assetRoot = resolveFromConfig(config, job.assetRoot);
   console.log(`\n[open] ${job.name ?? editUrl}`);
 
-  const { page, pageText } = await openEditPageWithRetry(context, editUrl);
-  const store = identifyStore(pageText, config.storeMap, job.name);
-  const assets = await loadStoreAssets(assetRoot, store.folder);
+  let page;
+  try {
+    const opened = await openEditPageWithRetry(context, editUrl);
+    page = opened.page;
+    const store = identifyStore(opened.pageText, config.storeMap, job.name);
+    const assets = await loadStoreAssets(assetRoot, store.folder);
+    const skipImages = shouldSkipImageUpload(config, job);
+    const assetSignature = await fingerprintAssets(assets, { skipImages });
+    if (!skipImages && config.requiredImageCount != null) verifySavedImageCount(assets.images.length, config.requiredImageCount, 'Local image set');
+    const expectedImageCount = skipImages ? await productImageCount(page) : assets.images.length;
 
-  console.log(`[match] ${store.match} -> ${store.folder}`);
-  console.log(formatAssetSummary(assets));
-  for (const imagePath of assets.images) console.log(`  - ${imagePath}`);
+    console.log(`[match] ${store.match} -> ${store.folder}`);
+    console.log(formatAssetSummary(assets));
+    for (const imagePath of assets.images) console.log(`  - ${imagePath}`);
 
-  if (mode === "dry-run") {
-    console.log("[dry-run] No page fields changed and no save clicked.");
-    return;
+    if (mode === "dry-run") {
+      console.log("[dry-run] No page fields changed and no save clicked.");
+      return;
+    }
+
+    await fillTitleAndDetail(page, assets);
+    if (shouldSkipImageUpload(config, job)) {
+      console.log("[images] Skipped image upload by config.");
+    } else {
+      await clearExistingProductImages(page);
+      await uploadProductImages(page, assets.images, {
+        maxAttempts: config.imageUploadAttempts,
+        timeoutMs: config.imageUploadTimeoutMs
+      });
+      await waitAfterPotentialUpload(page);
+    }
+
+    if (mode === "fill") {
+      console.log("[fill] Filled page and uploaded images. Save was not clicked.");
+      return;
+    }
+
+    await clickWhiteSaveButton(page);
+    console.log("[save] Clicked the white 保存 button only.");
+    const saveState = await waitForSaveFeedback(page);
+    console.log(`[save] Feedback wait: ${saveState}.`);
+    const verifyText = config.verifySavedText !== false;
+    const verifyImages = config.verifySavedImages !== false;
+    if (verifyText || verifyImages) {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+      await waitForVisibleFormField(page, 'input[type="text"]', TITLE_INPUT_INDEX);
+      await waitForVisibleFormField(page, "textarea", 0);
+      const savedTitle = await page.locator('input[type="text"]:visible').nth(TITLE_INPUT_INDEX).inputValue();
+      const savedDetail = await page.locator('textarea:visible').nth(0).inputValue();
+      if (verifyText) verifySavedListingText({ title: savedTitle, detail: savedDetail }, assets);
+      if (verifyImages) {
+        await productImageSection(page).waitFor({ state: 'visible', timeout: 30000 });
+        await page.waitForFunction(({ title, expected }) => {
+          const section = [...document.querySelectorAll('.page_edit_item')].find(el => el.querySelector('.title')?.textContent?.includes(title));
+          return section && section.querySelectorAll('.page_edit_img_item.imgItem').length === expected;
+        }, { title: PRODUCT_IMAGE_SECTION_TITLE, expected: expectedImageCount }, { timeout: 30000 });
+        verifySavedImageCount(await productImageCount(page), expectedImageCount);
+      }
+      console.log(`[save verified] Reloaded draft; text=${verifyText}, images=${verifyImages ? expectedImageCount : 'not checked'}.`);
+    }
+    return { verificationVersion: verifyText && verifyImages ? 1 : 0, verifiedImageCount: verifyImages ? expectedImageCount : null, assetSignature };
+  } finally {
+    if (page) await page.close().catch(() => {});
   }
+}
 
-  await fillTitleAndDetail(page, assets);
-  if (shouldSkipImageUpload(config, job)) {
-    console.log("[images] Skipped image upload by config.");
-  } else {
-    await clearExistingProductImages(page);
-    await uploadProductImages(page, assets.images);
-    await waitAfterPotentialUpload(page);
+export function verifySavedListingText(actual, expected) {
+  const normalize = value => String(value || "").normalize("NFC").replace(/\r\n/g, "\n").trim();
+  if (normalize(actual.title) !== normalize(expected.title) || normalize(actual.detail) !== normalize(expected.detail)) {
+    throw new Error(`Saved draft text does not match reviewed copy after reload; completion was not recorded. Title ${visibleCharacterLength(actual.title)}/${visibleCharacterLength(expected.title)}, detail ${String(actual.detail || '').length}/${String(expected.detail || '').length}.`);
   }
+  return true;
+}
 
-  if (mode === "fill") {
-    console.log("[fill] Filled page and uploaded images. Save was not clicked.");
-    return;
+export function verifySavedImageCount(actual, expected, label = 'Saved draft') {
+  if (!Number.isInteger(expected) || expected < 0 || actual !== expected) {
+    throw new Error(`${label} image count mismatch: expected ${expected}, received ${actual}; completion was not recorded.`);
   }
+  return true;
+}
 
-  await clickWhiteSaveButton(page);
-  console.log("[save] Clicked the white 保存 button only.");
-  const saveState = await waitForSaveFeedback(page);
-  console.log(`[save] Feedback wait: ${saveState}.`);
+async function processSaveJobWithRetry(context, config, job) {
+  const maxAttempts = Math.max(1, Number(config.saveJobAttempts) || DEFAULT_SAVE_JOB_ATTEMPTS);
+  const cooldownMs = Math.max(0, Number(config.saveRetryCooldownMs) || DEFAULT_SAVE_RETRY_COOLDOWN_MS);
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await processJob(context, config, job, "save");
+    } catch (error) {
+      lastError = error;
+      if (isNonRetryableBigSellerError(error)) break;
+      if (attempt >= maxAttempts) break;
+      console.log(`[retry] ${job.name ?? job.editUrl} failed; reopening a fresh page in ${Math.round(cooldownMs / 1000)}s (${attempt + 1}/${maxAttempts}).`);
+      await new Promise((resolve) => setTimeout(resolve, cooldownMs));
+    }
+  }
+  throw lastError;
 }
 
 async function main() {
@@ -1371,9 +1579,11 @@ async function main() {
   const config = await loadConfig(args.configPath);
   const { chromium } = await import("playwright");
   const userDataDir = resolveFromConfig(config, config.browser.userDataDir);
+  const browserOptions = await resolveChromeLaunchOptions(config.browser);
+  console.log(`[browser] Using Chrome: ${browserOptions.executablePath || browserOptions.channel}`);
 
   const context = await chromium.launchPersistentContext(userDataDir, {
-    channel: "chrome",
+    ...browserOptions,
     headless: Boolean(config.browser.headless),
     viewport: null,
     args: ["--start-maximized"]
@@ -1383,22 +1593,46 @@ async function main() {
     if (args.mode === "login") {
       const firstJobUrl = config.jobs?.[0]?.editUrl ?? config.draftListUrl ?? DEFAULT_DRAFT_LIST_URL;
       await waitForLogin(context, firstJobUrl);
-      return;
+      return args.mode;
     }
 
     if (args.mode === "discover") {
       await discoverJobsFromSkuGroups(context, config, args.outPath);
-      return;
+      return args.mode;
     }
 
     if (args.mode === "source") {
       await downloadSourceImagesFromSkuGroups(context, config, args.outDir);
-      return;
+      return args.mode;
     }
 
     if (args.mode === "copy") {
       await copySourceProductsToDrafts(context, config);
-      return;
+      return args.mode;
+    }
+
+    if (args.mode === "save") {
+      const progress = await loadSaveProgress(config.configPath);
+      const signatures = {};
+      for (const job of config.jobs) {
+        const store = identifyStore('', config.storeMap, job.name);
+        const assets = await loadStoreAssets(resolveFromConfig(config, job.assetRoot), store.folder);
+        signatures[jobProgressKey(job)] = await fingerprintAssets(assets, { skipImages: shouldSkipImageUpload(config, job) });
+      }
+      const pendingJobs = pendingSaveJobs(config.jobs, progress, config.requiredSaveVerificationVersion || 0, signatures);
+      const skippedCount = config.jobs.length - pendingJobs.length;
+      if (skippedCount > 0) console.log(`[progress] Skipping ${skippedCount} already-saved job(s).`);
+      const storeCooldownMs = Math.max(0, Number(config.storeCooldownMs) || DEFAULT_STORE_COOLDOWN_MS);
+      for (let index = 0; index < pendingJobs.length; index += 1) {
+        const job = pendingJobs[index];
+        const verification = await processSaveJobWithRetry(context, config, job);
+        await recordCompletedSaveJob(config.configPath, progress, job, verification);
+        if (index < pendingJobs.length - 1 && storeCooldownMs > 0) {
+          console.log(`[cooldown] Waiting ${Math.round(storeCooldownMs / 1000)}s before the next store.`);
+          await new Promise((resolve) => setTimeout(resolve, storeCooldownMs));
+        }
+      }
+      return args.mode;
     }
 
     for (const job of config.jobs) {
@@ -1407,11 +1641,11 @@ async function main() {
   } finally {
     await context.close();
   }
+  return args.mode;
 }
 
-const isCli = import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isCli) {
-  main().catch((error) => {
+if (isCliEntrypoint(import.meta.url, process.argv[1])) {
+  runCliWithCompletion(main).catch((error) => {
     console.error(`\nERROR: ${error.message}`);
     process.exitCode = 1;
   });

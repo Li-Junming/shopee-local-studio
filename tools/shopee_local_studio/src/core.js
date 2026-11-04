@@ -1,55 +1,84 @@
 ﻿import path from "node:path";
 
+
 export const STORE_DEFINITIONS = [
   {
     id: "4",
-    label: "Store 4 Skinora Care",
+    label: "陈--胡志明--4店",
     folder: "store_4_skinora_care",
-    style: "clean white-gray and soft blue Skinora Care ecommerce poster, TOP BEAUTY PICKS trust layout"
+    style: "clean white-gray and soft blue Skinora Care ecommerce poster, TOP BEAUTY PICKS trust layout",
+    defaultSelected: false
   },
   {
     id: "5",
-    label: "Store 5 Skinora Fresh",
+    label: "陈--胡志明--5店",
     folder: "store_5_skinora_fresh",
-    style: "fresh clean Scent & Glow ecommerce poster, soft pink-white store frame, polished Shopee beauty design"
+    style: "fresh clean Scent & Glow ecommerce poster, soft pink-white store frame, polished Shopee beauty design",
+    defaultSelected: false
   },
   {
     id: "6",
-    label: "Store 6 Skinora Luxe",
+    label: "陈--胡志明--6店",
     folder: "store_6_skinora_luxe",
-    style: "premium gold and calm neutral Skinora ecommerce poster, refined repair-care beauty layout"
+    style: "premium gold and calm neutral Skinora ecommerce poster, refined repair-care beauty layout",
+    defaultSelected: false
   },
   {
     id: "7",
-    label: "Store 7 Skinora",
+    label: "陈--胡志明--7店",
     folder: "store_7_skinora",
-    style: "soft pink and gold Skinora ecommerce poster, elegant beauty layout"
+    style: "soft pink and gold Skinora ecommerce poster, elegant beauty layout",
+    defaultSelected: false
   },
   {
     id: "8",
-    label: "Store 8 Skinora Beauty",
+    label: "陈--胡志明--8店",
     folder: "store_8_skinora_beauty",
-    style: "Skinora Beauty natural integrated Shopee ecommerce poster, light navy store identity, soft white-blue beauty background, natural product-and-box hero"
+    style: "Skinora Beauty natural integrated Shopee ecommerce poster, light navy store identity, soft white-blue beauty background, natural product-and-box hero",
+    defaultSelected: false
   },
   {
     id: "9",
-    label: "Store 9 Elora Skin",
+    label: "陈--胡志明--9店",
     folder: "store_9_elora_skin",
-    style: "white and red Elora Skin ecommerce poster, bold conversion-focused layout"
+    style: "white and red Elora Skin ecommerce poster, bold conversion-focused layout",
+    defaultSelected: false
+  },
+  {
+    id: "2仓1",
+    label: "陈--平政--1店",
+    folder: "store_warehouse_2_1",
+    style: "clean teal-white ecommerce poster, clear product hierarchy, restrained conversion accents, and the target store frame when available",
+    defaultSelected: false
+  },
+  {
+    id: "2仓2",
+    label: "陈--平政--2店",
+    folder: "store_warehouse_2_2",
+    style: "fresh lilac-white ecommerce poster, airy product presentation, concise benefits, and the target store frame when available",
+    defaultSelected: false
+  },
+  {
+    id: "2仓3",
+    label: "陈--平政--3店",
+    folder: "store_warehouse_2_3",
+    style: "warm peach-sand ecommerce poster, polished product focus, balanced benefit blocks, and the target store frame when available",
+    defaultSelected: false
+  },
+  {
+    id: "2仓4",
+    label: "陈--平政--4店",
+    folder: "store_warehouse_2_4",
+    style: "modern charcoal-silver ecommerce poster, crisp product focus, strong readable hierarchy, and the target store frame when available",
+    defaultSelected: false
   }
 ];
 
-export const DEFAULT_TARGET_STORE_IDS = STORE_DEFINITIONS.map((store) => store.id);
+export const DEFAULT_TARGET_STORE_IDS = STORE_DEFINITIONS
+  .filter((store) => store.defaultSelected !== false)
+  .map((store) => store.id);
 const MAX_IMAGE_REFERENCE_SOURCE_IMAGES = 2;
 
-const BIGSELLER_STORE_MATCH_BY_ID = {
-  4: "\u59d0\u592b 4\u5e97\uff08\u80e1\uff09",
-  5: "\u59d0\u592b 5\u5e97\uff08\u80e1\uff09",
-  6: "\u59d0\u592b 6\u5e97\uff08\u80e1\uff09",
-  7: "\u59d0\u592b 7\u5e97\uff08\u80e1\uff09",
-  8: "\u59d0\u592b8\u5e97\uff08\u80e1\uff09",
-  9: "\u59d0\u592b9\u5e97\uff08\u80e1\uff09"
-};
 
 const STORE_DIFFERENTIATION_BY_ID = {
   4: {
@@ -145,9 +174,9 @@ const STORE_SLOT_COMPOSITION_BY_ID = {
   }
 };
 
-export function buildBigSellerStoreMap(targetStores = STORE_DEFINITIONS.map((store) => store.id)) {
+export function buildBigSellerStoreMap(targetStores = DEFAULT_TARGET_STORE_IDS) {
   return storesFor(targetStores).map((store) => ({
-    match: BIGSELLER_STORE_MATCH_BY_ID[store.id] || `${store.id}\u5e97`,
+    match: store.label,
     folder: store.folder
   }));
 }
@@ -358,12 +387,15 @@ export function buildImage2Config(task) {
   }
 
   return {
-    model: task.model || "gpt-image-2",
+    model: task.model || "gpt-image-2.5",
     size: task.size || "1024x1024",
     outputSize: 800,
     outputFormat: "png",
     quality: task.quality || "low",
     concurrency: Number(task.concurrency || 1),
+    requestTimeoutMs: Number(task.requestTimeoutMs || 180000),
+    requestMaxAttempts: Number(task.requestMaxAttempts || 1),
+    maxRetryableFailures: Number(task.maxRetryableFailures || 2),
     outputDir: path.join(task.taskDir, "images"),
     jobs
   };
@@ -705,6 +737,21 @@ export function pipelineStartBlockers(preflight = {}, task = null) {
 
 export function buildTaskProgress(task = {}, context = {}) {
   const status = String(task?.status || "created");
+  if (status === "interrupted") {
+    return progress("failed", "error", "流程已中断", task.interruption?.message || "旧执行流程已中断，未确认完成；已有图片和待执行队列已保留。",
+      task.pipelineTiming?.scope === "images_only"
+        ? "不会自动重试。确认旧请求和旧进程已结束后，手动点击生成图片补缺图，不自动操作 BigSeller。时长截至最后确认活动。"
+        : "不会自动重试。请先核对原请求结果及已有草稿；确认旧进程已退出后，手动继续。显示时长截至最后确认活动，并非连续运行时长。");
+  }
+  if (task.pipelineTiming?.scope === "images_only" && ["generating_images", "regenerating_images", "image2_done", "image2_failed"].includes(status)) {
+    if (status === "image2_failed") {
+      return progress("failed", "error", "本次生图已停止", "本次独立生图未完成，已有图片已保留；具体原因请查看日志。", "排除日志中的问题后，点击生成图片补缺图；不会自动操作 BigSeller。");
+    }
+    if (status === "image2_done") {
+      return progress("image_generation", "ready", "本次生图已完成", "本次仅生成图片，没有执行 BigSeller 复制、查找或保存草稿。", "先检查图片；如需保存草稿，再手动启动全流程。");
+    }
+    return progress("image_generation", "running", "正在生成图片（独立生图）", "正在补齐各店图片，已有图片会跳过。", "等待本次生图结束；本操作不会自动复制、查找或保存 BigSeller 草稿。");
+  }
   const preflight = context.preflight || {};
   const blockers = preflight.blockers || [];
   const blockerMessage = blockers.map((item) => item.message).filter(Boolean).join(" ");
@@ -714,7 +761,7 @@ export function buildTaskProgress(task = {}, context = {}) {
     return progress("done", "done", "\u5df2\u5b8c\u6210", "\u81ea\u52a8\u6d41\u7a0b\u5df2\u5b8c\u6210\uff0c\u53ef\u4ee5\u5728\u7ed3\u679c\u5e93\u67e5\u770b\u5404\u5e97\u56fe\u7247\u3002", "\u68c0\u67e5\u7ed3\u679c\u56fe\uff0c\u4e0d\u6ee1\u610f\u7684\u5e97\u94fa\u53ef\u4ee5\u91cd\u751f\u3002");
   }
   if (isFailureStatus(status)) {
-    return progress("failed", "error", "\u6d41\u7a0b\u9700\u5904\u7406", blockerMessage || "\u540e\u53f0\u6d41\u7a0b\u5931\u8d25\u6216\u88ab\u9884\u68c0\u62e6\u622a\uff0c\u8bf7\u67e5\u770b\u65e5\u5fd7\u4e2d\u7684\u5931\u8d25\u539f\u56e0\u3002", "\u4fee\u590d\u95ee\u9898\u540e\u518d\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
+    return progress("failed", "error", task.copyGenerationError ? "文案生成或审核未通过" : "流程需处理", task.lastPipelineError || task.copyGenerationError || blockerMessage || "后台流程失败，请查看日志中的失败原因。", "修复问题后再点一键开始/继续自动流程。");
   }
   if (sourceState.required && !sourceState.ready && !shouldAutoConfirmSource(task)) {
     return progress("source_review", "action", "\u7b49\u5f85\u786e\u8ba4 1\u5e97\u5546\u54c1", "\u5df2\u627e\u5230 1\u5e97\u6765\u6e90\uff0c\u9700\u8981\u5148\u786e\u8ba4\u662f\u5426\u662f\u6b63\u786e\u5546\u54c1\u3002", "\u786e\u8ba4 1\u5e97\u5546\u54c1\u540e\uff0c\u518d\u70b9\u4e00\u952e\u5f00\u59cb/\u7ee7\u7eed\u81ea\u52a8\u6d41\u7a0b\u3002");
@@ -738,7 +785,10 @@ export function buildTaskProgress(task = {}, context = {}) {
   if (["pipeline_copying_source_to_bigseller_drafts", "copying_source_to_bigseller_drafts", "bigseller_copy_config_ready"].includes(status)) {
     return progress("bigseller_copy", "running", "\u6b63\u5728\u590d\u5236 1\u5e97\u5230\u76ee\u6807\u5e97\u8349\u7a3f", "\u7cfb\u7edf\u6b63\u5728 BigSeller \u6309 SKU \u627e\u5230 1\u5e97\u5728\u7ebf\u5546\u54c1\uff0c\u5e76\u53ea\u590d\u5236\u5230\u7f3a\u5931\u8349\u7a3f\u7684 4-9 \u5e97\u3002", "\u7b49\u5f85 BigSeller \u590d\u5236\u5b8c\u6210\uff0c\u7136\u540e\u518d\u67e5\u627e\u8349\u7a3f\u5e76\u4e0a\u4f20\u56fe\u7247\u3002");
   }
-  if (["pipeline_generating_images", "generating_images", "regenerating_images", "image2_config_ready"].includes(status)) {
+  if (["pipeline_generating_images", "pipeline_waiting_image_api", "generating_images", "regenerating_images", "image2_config_ready"].includes(status)) {
+    if (status === "pipeline_waiting_image_api") {
+      return progress("image_generation", "running", "生图服务冷却等待", "上游生图连续超时，系统已保留现有图片并等待后自动补缺图。", "无需手动点击；系统会在冷却结束后自动继续，连续两轮没有新图才会停止。");
+    }
     return progress("image_generation", "running", "\u6b63\u5728\u751f\u6210\u5404\u5e97\u56fe\u7247", "\u7cfb\u7edf\u6b63\u5728\u6309 4-9 \u5e97\u8fb9\u6846\u548c\u5e97\u94fa\u98ce\u683c\u751f\u6210\u56fe\u3002", "\u7b49\u5f85\u751f\u6210\u5b8c\u6210\uff0c\u7136\u540e\u5339\u914d\u8349\u7a3f\u5e76\u4fdd\u5b58\u56fe\u7247\u3002");
   }
   if (["pipeline_discovering_bigseller_drafts", "discovering_bigseller_drafts", "bigseller_config_ready"].includes(status)) {
@@ -768,7 +818,7 @@ export function pipelineStageForStatus(status) {
   if (["fetching_source_images", "source_config_ready", "pipeline_queued"].includes(value)) return "source_lookup";
   if (value === "source_review_required") return "source_review";
   if (["pipeline_copying_source_to_bigseller_drafts", "copying_source_to_bigseller_drafts", "bigseller_copy_config_ready"].includes(value)) return "bigseller_copy";
-  if (["pipeline_generating_images", "generating_images", "regenerating_images", "image2_config_ready"].includes(value)) return "image_generation";
+  if (["pipeline_generating_images", "pipeline_waiting_image_api", "generating_images", "regenerating_images", "image2_config_ready"].includes(value)) return "image_generation";
   if (["pipeline_discovering_bigseller_drafts", "discovering_bigseller_drafts", "bigseller_config_ready", "bigseller_copy_done", "image2_done"].includes(value)) return "bigseller_discover";
   if (["pipeline_saving_bigseller_drafts", "saving_bigseller_drafts", "bigseller_discover_done"].includes(value)) return "bigseller_save";
   if (value === "preflight_blocked") return "blocked";
@@ -778,13 +828,16 @@ export function pipelineStageForStatus(status) {
 export function pipelineStageCompleted(task = {}, stage, context = {}) {
   const status = String(task?.status || "");
   if (status === "pipeline_done") return true;
-  const stages = task?.pipelineTiming?.stages || {};
   if (stage === "bigseller_copy") {
+    const result = task.commandResults?.bigseller_copy;
+    if (result) {
+      return (result.exitCode === 0 && result.verified === true && !result.error && result.scope === commandResultScope(task)) || Boolean(context.hasDiscoveredConfig);
+    }
     return [
       "bigseller_copy_done",
       "bigseller_discover_done",
       "bigseller_save_done"
-    ].includes(status) || Boolean(stages.bigseller_copy?.finishedAt) || Boolean(context.hasDiscoveredConfig);
+    ].includes(status) || Boolean(context.hasDiscoveredConfig);
   }
   if (stage === "image_generation") {
     return [
@@ -794,22 +847,66 @@ export function pipelineStageCompleted(task = {}, stage, context = {}) {
     ].includes(status) || Number(context.imageCount || 0) >= expectedGeneratedImageCount(task);
   }
   if (stage === "bigseller_discover") {
+    const result = task.commandResults?.bigseller_discover;
+    if (result) return (result.exitCode === 0 && result.verified === true && !result.error && result.scope === commandResultScope(task)) || Boolean(context.hasDiscoveredConfig);
     return [
       "bigseller_discover_done",
       "bigseller_save_done"
     ].includes(status) || Boolean(context.hasDiscoveredConfig);
   }
   if (stage === "bigseller_save") {
+    const result = task.commandResults?.bigseller_save;
+    if (result) return result.exitCode === 0 && result.verified === true && !result.error && result.scope === commandResultScope(task);
     return status === "bigseller_save_done";
   }
   return false;
+}
+
+function commandResultScope(task) {
+  return JSON.stringify({
+    targetStores: [...(task.targetStores || [])].map(String).sort(),
+    skuGroup: effectiveBigSellerSkuGroup(task).slice().sort(),
+    itemIds: effectiveBigSellerItemIds(task).slice().sort()
+  });
+}
+
+export function recordCommandResult(task, label, exitCode, nowIso = new Date().toISOString(), verification = {}) {
+  return {
+    ...(task.commandResults || {}),
+    [label]: { ...verification, exitCode, finishedAt: nowIso, scope: commandResultScope(task) }
+  };
 }
 
 export function expectedGeneratedImageCount(task = {}) {
   return resolveTargetStoreIds(task?.targetStores || []).length * 4;
 }
 
+export function startStandaloneImageTiming(nowIso = new Date().toISOString()) {
+  return {
+    scope: "images_only",
+    startedAt: nowIso,
+    finishedAt: "",
+    activeStage: "image_generation",
+    stages: { image_generation: { startedAt: nowIso } }
+  };
+}
+
 export function recordPipelineTiming(currentTiming, status, nowIso = new Date().toISOString()) {
+  if (currentTiming?.scope === "images_only" && ["image2_done", "image2_failed"].includes(status)) {
+    return {
+      ...currentTiming,
+      finishedAt: nowIso,
+      activeStage: "image_generation",
+      stages: {
+        ...currentTiming.stages,
+        image_generation: {
+          ...currentTiming.stages?.image_generation,
+          finishedAt: nowIso,
+          outcome: status === "image2_done" ? "success" : "failed"
+        }
+      }
+    };
+  }
   const stage = pipelineStageForStatus(status);
   if (!stage) return currentTiming || null;
   if (String(status || "") === "pipeline_queued") {
@@ -824,6 +921,7 @@ export function recordPipelineTiming(currentTiming, status, nowIso = new Date().
   }
 
   const timing = {
+    ...(currentTiming?.scope ? { scope: currentTiming.scope } : {}),
     startedAt: currentTiming?.startedAt || nowIso,
     finishedAt: currentTiming?.finishedAt || "",
     activeStage: currentTiming?.activeStage || "",
@@ -843,6 +941,7 @@ export function recordPipelineTiming(currentTiming, status, nowIso = new Date().
 
   if (["done", "failed", "blocked"].includes(stage)) {
     timing.finishedAt = nowIso;
+    timing.stages[stage].finishedAt = nowIso;
   } else {
     timing.finishedAt = "";
   }
@@ -940,8 +1039,14 @@ function sourceStoreEvidencePresent(task = {}) {
 }
 
 export function extractSourceDraftSkuGroup(manifest = {}) {
+  const sourceRowText = String(manifest.sourceRowText || "");
+  const sellerSkuMarker = sourceRowText.lastIndexOf("--");
+  if (sellerSkuMarker >= 0) {
+    const sellerSkus = extractSkuTokens(sourceRowText.slice(sellerSkuMarker + 2));
+    if (sellerSkus.length) return sellerSkus;
+  }
+
   return extractSkuTokens([
-    manifest.sourceRowText,
     manifest.skuText,
     manifest.skusText
   ].filter(Boolean).join(" "));
@@ -959,6 +1064,10 @@ export function effectiveBigSellerItemIds(task = {}) {
 
 export function buildBigSellerSkuConfig({ productName, skuGroup, assetRoot, targetStores }) {
   return {
+    verifySavedText: true,
+    verifySavedImages: true,
+    requiredImageCount: 4,
+    requiredSaveVerificationVersion: 1,
     storeMap: buildBigSellerStoreMap(targetStores),
     discoverJobs: [
       {
@@ -1004,7 +1113,22 @@ export function sourceImagesMissingMessage(task) {
 }
 
 export function normalizeImageApiConfig(input = {}) {
-  const rawBaseUrl = String(input?.baseUrl || "https://api.openai.com/v1").trim();
+  const baseUrl = normalizeImageApiUrl(input?.baseUrl || "https://api.openai.com/v1");
+  const apiKey = String(input?.apiKey || "").trim();
+  const model = String(input?.model || "gpt-image-2.5").trim() || "gpt-image-2.5";
+  const config = apiKey ? { baseUrl, apiKey, model } : { baseUrl, model };
+  const rawFallbackBaseUrl = String(input?.fallbackBaseUrl || "").trim();
+  if (rawFallbackBaseUrl) {
+    config.fallbackBaseUrl = normalizeImageApiUrl(rawFallbackBaseUrl);
+    const fallbackApiKey = String(input?.fallbackApiKey || "").trim();
+    if (fallbackApiKey) config.fallbackApiKey = fallbackApiKey;
+    config.fallbackModel = String(input?.fallbackModel || model).trim() || model;
+  }
+  return config;
+}
+
+function normalizeImageApiUrl(value) {
+  const rawBaseUrl = String(value || "").trim();
   let parsed;
   try {
     parsed = new URL(rawBaseUrl);
@@ -1013,17 +1137,21 @@ export function normalizeImageApiConfig(input = {}) {
   }
   parsed.hash = "";
   parsed.search = "";
-  const baseUrl = parsed.toString().replace(/\/+$/u, "");
-  const apiKey = String(input?.apiKey || "").trim();
-  return apiKey ? { baseUrl, apiKey } : { baseUrl };
+  return parsed.toString().replace(/\/+$/u, "");
 }
 
 export function publicImageApiConfig(config = {}) {
   const normalized = normalizeImageApiConfig(config);
   return {
     baseUrl: normalized.baseUrl,
+    model: normalized.model,
     apiKeySet: Boolean(normalized.apiKey),
-    maskedApiKey: maskSecret(normalized.apiKey)
+    maskedApiKey: maskSecret(normalized.apiKey),
+    fallbackEnabled: Boolean(normalized.fallbackBaseUrl),
+    fallbackBaseUrl: normalized.fallbackBaseUrl || "",
+    fallbackModel: normalized.fallbackModel || normalized.model,
+    fallbackApiKeySet: Boolean(normalized.fallbackApiKey),
+    maskedFallbackApiKey: maskSecret(normalized.fallbackApiKey)
   };
 }
 
@@ -1054,6 +1182,7 @@ export function describeImage2Runtime(env = process.env, config = {}) {
   const runtime = {
     apiKeySet: Boolean(effectiveEnv.OPENAI_API_KEY),
     baseUrl,
+    model: String(config?.model || "gpt-image-2.5").trim() || "gpt-image-2.5",
     localProxy: null
   };
   if (config?.apiKey || config?.baseUrl) runtime.configSource = "local";
@@ -1086,7 +1215,7 @@ const CHINESE_RE = /[\u3400-\u9FFF]/;
 const MOJIBAKE_RE = /\?{2,}|\uFFFD/;
 const BUYER_COPY_STANDARD = Object.freeze({
   titleMin: 90,
-  titleMax: 99,
+  titleMax: 100,
   detailSections: [
     vietnameseText("C\\u00f4ng d\\u1ee5ng ch\\u00ednh"),
     vietnameseText("\\u0110\\u1ed1i t\\u01b0\\u1ee3ng ph\\u00f9 h\\u1ee3p"),
@@ -1094,6 +1223,32 @@ const BUYER_COPY_STANDARD = Object.freeze({
     vietnameseText("C\\u00e1ch d\\u00f9ng"),
     vietnameseText("C\\u00e1ch b\\u1ea3o qu\\u1ea3n")
   ]
+});
+const WAREHOUSE_COPY_VARIANTS = Object.freeze({
+  "2\u4ed31": {
+    baseStoreId: "4",
+    titleAngle: "\u1ed4n \u0111\u1ecbnh d\u1ec5 d\u00f9ng",
+    benefitLine: "- \u01afu ti\u00ean tr\u1ea3i nghi\u1ec7m \u1ed5n \u0111\u1ecbnh, d\u1ec5 d\u00f9ng v\u00e0 ph\u00f9 h\u1ee3p th\u00f3i quen h\u1eb1ng ng\u00e0y.",
+    rotation: 0
+  },
+  "2\u4ed32": {
+    baseStoreId: "5",
+    titleAngle: "T\u01b0\u01a1i nh\u1eb9 linh ho\u1ea1t",
+    benefitLine: "- T\u1eadp trung c\u1ea3m gi\u00e1c t\u01b0\u01a1i nh\u1eb9, g\u1ecdn g\u00e0ng v\u00e0 thu\u1eadn ti\u1ec7n khi s\u1eed d\u1ee5ng.",
+    rotation: 1
+  },
+  "2\u4ed33": {
+    baseStoreId: "6",
+    titleAngle: "Ch\u1ec9n chu chuy\u00ean s\u00e2u",
+    benefitLine: "- H\u01b0\u1edbng \u0111\u1ebfn tr\u1ea3i nghi\u1ec7m ch\u1ec9n chu, tinh t\u1ebf v\u00e0 ph\u00f9 h\u1ee3p nhu c\u1ea7u ch\u0103m s\u00f3c k\u1ef9 h\u01a1n.",
+    rotation: 2
+  },
+  "2\u4ed34": {
+    baseStoreId: "9",
+    titleAngle: "Ti\u1ec7n l\u1ee3i r\u00f5 c\u00f4ng d\u1ee5ng",
+    benefitLine: "- Nh\u1ea5n m\u1ea1nh t\u00ednh th\u1ef1c t\u1ebf, thao t\u00e1c \u0111\u01a1n gi\u1ea3n v\u00e0 l\u1ee3i \u00edch r\u00f5 r\u00e0ng khi s\u1eed d\u1ee5ng.",
+    rotation: 3
+  }
 });
 
 export function makeListingDraft({ productName, notes = "", storeId = "7", skuGroup = [], requireIdentity = false, allowFallbackIdentity = false }) {
@@ -1129,25 +1284,83 @@ function buildBuyerCopyRules({ profile, storeId, benefitLines }) {
   // This is the single assembly point for buyer-facing listing copy.
   // Keep title/detail structure changes here so the pipeline does not grow scattered rules.
   const [benefitsHeading, audienceHeading, sensationHeading, usageHeading, storageHeading] = BUYER_COPY_STANDARD.detailSections;
+  const warehouseVariant = WAREHOUSE_COPY_VARIANTS[storeId] || null;
+  const copyStoreId = warehouseVariant?.baseStoreId || storeId;
+  if (profile.type === "primer") {
+    const primer = primerCopyForStore(storeId);
+    return {
+      titlePhraseSets: primer.titlePhraseSets,
+      sections: [
+        { heading: benefitsHeading, lines: primer.benefits },
+        { heading: audienceHeading, lines: primer.audience },
+        { heading: sensationHeading, lines: primer.sensation },
+        { heading: usageHeading, lines: primer.usage },
+        { heading: storageHeading, lines: storageForStore(storeId) }
+      ]
+    };
+  }
   const formalSkincareSections = profile.type === "skincare" && !benefitLines
-    ? formalSkincareSectionsForStore(storeId)
+    ? formalSkincareSectionsForStore(copyStoreId)
     : null;
   const sectionLines = {
-    [benefitsHeading]: formalSkincareSections?.benefits || benefitLines || benefitsForStore(profile, storeId),
-    [audienceHeading]: formalSkincareSections?.audience || audienceForStore(profile, storeId),
-    [sensationHeading]: formalSkincareSections?.sensation || sensationForStore(profile, storeId),
-    [usageHeading]: formalSkincareSections?.usage || usageForStore(profile, storeId),
-    [storageHeading]: formalSkincareSections?.storage || storageForStore(storeId)
+    [benefitsHeading]: formalSkincareSections?.benefits || benefitLines || benefitsForStore(profile, copyStoreId),
+    [audienceHeading]: formalSkincareSections?.audience || audienceForStore(profile, copyStoreId),
+    [sensationHeading]: formalSkincareSections?.sensation || sensationForStore(profile, copyStoreId),
+    [usageHeading]: formalSkincareSections?.usage || usageForStore(profile, copyStoreId),
+    [storageHeading]: formalSkincareSections?.storage || storageForStore(copyStoreId)
   };
   return {
-    titlePhraseSets: titlePhraseSetsForStore(storeId, profile),
+    titlePhraseSets: titlePhraseSetsForStore(copyStoreId, profile).map((phrases) => warehouseVariant
+      ? [warehouseVariant.titleAngle, ...phrases]
+      : phrases),
     sections: BUYER_COPY_STANDARD.detailSections.map((heading) => ({
       heading,
-      lines: sectionLines[heading]
+      lines: warehouseCopySectionLines(sectionLines[heading], warehouseVariant, heading === benefitsHeading)
     }))
   };
 }
 
+function primerCopyForStore(storeId) {
+  const focus = {
+    4: "Kem lót tán mỏng",
+    5: "Lót trước lớp nền",
+    6: "Lót nền chỉn chu",
+    7: "Kem lót hằng ngày",
+    8: "Tán lót đều màu",
+    9: "Lót trước makeup"
+  };
+  const phrase = focus[storeId] || focus[7];
+  return {
+    titlePhraseSets: [[phrase, "trước bước trang điểm", "dùng hằng ngày"]],
+    benefits: [
+      `- ${phrase}.`,
+      "- Dùng để chuẩn bị bề mặt da trước các bước trang điểm tiếp theo.",
+      "- Có thể kết hợp với kem nền hoặc phấn phủ theo cách trang điểm cá nhân.",
+      "- Công dụng và cách dùng cụ thể cần đối chiếu với hướng dẫn trên bao bì."
+    ],
+    audience: [
+      "- Phù hợp người đang tìm kem lót để dùng trước bước kem nền.",
+      "- Lựa chọn theo nhu cầu trang điểm và hướng dẫn của sản phẩm."
+    ],
+    sensation: [
+      "- Tán một lớp mỏng để kiểm soát lượng kem trên bề mặt da.",
+      "- Cảm giác khi dùng có thể khác nhau tùy da và các lớp sản phẩm kết hợp."
+    ],
+    usage: [
+      "- Hoàn thành bước dưỡng da, sau đó lấy một lượng kem lót vừa đủ.",
+      "- Tán mỏng và đều trên mặt theo hướng dẫn trên bao bì.",
+      "- Tiếp tục với kem nền hoặc phấn phủ nếu cần; đây là bước lót trước trang điểm."
+    ]
+  };
+}
+
+function warehouseCopySectionLines(lines, variant, isBenefitsSection = false) {
+  const values = Array.isArray(lines) ? [...lines] : [];
+  if (!variant) return values;
+  const shift = values.length ? Math.abs(Number(variant.rotation) || 0) % values.length : 0;
+  const rotated = shift ? [...values.slice(shift), ...values.slice(0, shift)] : values;
+  return isBenefitsSection ? [variant.benefitLine, ...rotated] : rotated;
+}
 function formalSkincareSectionsForStore(storeId) {
   const commonStorage = [
     "- Bảo quản nơi khô thoáng, tránh ánh nắng trực tiếp và nhiệt độ cao.",
@@ -1291,15 +1504,14 @@ function formalSkincareSectionsForStore(storeId) {
 }
 
 function renderListingDetail(plan) {
-  return accentVietnameseCopy([
-    plan.cleanName,
-    "",
+  // Do not apply Vietnamese word substitutions to the English brand identity.
+  return `${plan.cleanName}\n${accentVietnameseCopy([
     ...plan.sections.flatMap((section) => [
       section.heading,
       ...section.lines,
       ""
     ])
-  ].filter(Boolean).join("\n").trim());
+  ].filter(Boolean).join("\n").trim())}`;
 }
 
 function audienceForStore(profile, storeId) {
@@ -1686,7 +1898,7 @@ function validateVietnameseListingLegacy({ title, detail }) {
   const detailText = String(detail || "").trim();
   const titleTextLength = titleLength(titleText);
   if (titleTextLength < 90 || titleTextLength > 99) {
-    errors.push("Title must be 90-99 characters.");
+    errors.push("Title must be 90-100 characters.");
   }
   if (/\?{2,}|\uFFFD/.test(titleText + detailText)) {
     errors.push("Title and detail must use unaccented ASCII Vietnamese.");
@@ -1710,7 +1922,7 @@ export function validateVietnameseListing({ title, detail }) {
 
   const titleTextLength = titleLength(titleText);
   if (titleTextLength < BUYER_COPY_STANDARD.titleMin || titleTextLength > BUYER_COPY_STANDARD.titleMax) {
-    errors.push("Title must be 90-99 characters.");
+    errors.push("Title must be 90-100 characters.");
   }
   if (/\bShopee\b/i.test(combinedText)) {
     errors.push("Title and detail must not contain Shopee.");
@@ -2191,7 +2403,7 @@ function mapMathLetters(value, { upperStart, lowerStart, digitStart, upperOverri
 }
 
 function titleLength(value) {
-  return Array.from(String(value || "")).length;
+  return Array.from(String(value || "").normalize("NFC")).length;
 }
 
 function trimWords(value, limit) {
@@ -2461,12 +2673,17 @@ function titlePhraseSetsForStore(storeId, profile) {
 function productProfile(productName, notes = "") {
   const nameText = asciiOnly(productName).toLowerCase();
   const text = asciiOnly(`${productName} ${notes}`).toLowerCase();
+  // Specific product identity must win over generic words such as "cream"
+  // and over skincare benefits mentioned in the source description.
+  if (/\b(?:correcting cream veil|primer|makeup base|make up base|kem lot)\b/.test(nameText)) {
+    return { type: "primer" };
+  }
   const clearLipProduct = /\b(?:lip|balm|rouge|loveshine|candy glow|tinted lip|son\s+(?:duong|moi|bong))\b/.test(text);
   const clearSkinCareProduct = /\b(?:foam cleanser|cleanser|face cleanser|soft clean|toner|lotion|serum|cream|creme|eye|hydrating|soothing|duong am|cap am|sua rua|rua mat|lam sach|thanh loc|nutritious|genifique|night repair|micro essence|estee|lancome|dalba|d alba|truffle)\b/.test(text);
   const clearMakeupProduct = /\b(?:foundation|skin foundation|kem nen|concealer|cushion|bb cream|cc cream|makeup base|primer|blush|cheek|powder|compact|phan|ma hong|makeup)\b/.test(text);
   const clearMakeupName = /\b(?:foundation|skin foundation|kem nen|concealer|cushion|bb cream|cc cream|makeup base|primer|blush|cheek|powder|compact|phan|ma hong|makeup)\b/.test(nameText);
   const clearCleanserName = /\b(?:foam cleanser|face cleanser|cleanser|sua rua|rua mat|nutritious 2-in-1 foam)\b/.test(nameText);
-  const clearSkincareName = /\b(?:serum|hydrating|hyaluronic|b5|ha|duong am|cap am|phuc hoi|lotion|toner|cream|creme|eye|soothing|genifique|night repair|micro essence)\b/.test(nameText);
+  const clearSkincareName = /\b(?:serum|tinh chat|hydrating|hyaluronic|b5|ha|duong am|cap am|phuc hoi|lotion|toner|cream|creme|eye|soothing|genifique|night repair|micro essence)\b/.test(nameText);
   if (clearMakeupName) return makeupProductProfile();
   if (clearCleanserName) return cleanserProductProfile();
   if (clearSkincareName) return skincareProductProfile();
@@ -2879,6 +3096,7 @@ function basePrompt(task, store, siblingStores = []) {
     `800x800 PNG Vietnamese Shopee ecommerce poster for ${productName}.`,
     "Keep the same product identity and packaging from reference images.",
     sourceIdentityPrompt(),
+    productCategoryPrompt(task),
     `Use target store style: ${store.style}.`,
     storeDifferentiationPrompt(store, siblingStores),
     imageReviewPrompt(task),
@@ -2890,6 +3108,12 @@ function basePrompt(task, store, siblingStores = []) {
 
 function sourceIdentityPrompt() {
   return "Source images are product evidence only: use them for product shape, packaging structure, color, material finish, and real item details. Must look like the same exact SKU/item, not merely the same product category. Preserve the exact visible product set: if references show one bottle plus one retail box, show one bottle plus one retail box. Do not replace the retail box with a second bottle or change the box color, label color, or package material. Do not copy source-store logos, source-store frames, source-store corner badges, Doudou, or source-store layout. Do not reproduce source-store logos even when they appear printed on source packaging; replace them with neutral unbranded packaging areas or hide them with a natural photo angle while keeping the product recognizable. Do not use source-store mascot or sticker graphics as decoration.";
+}
+
+function productCategoryPrompt(task) {
+  const name = buyerProductName(task.productName || "", task.skuGroup || []);
+  if (productProfile(name).type !== "primer") return "";
+  return "Product category: makeup primer (kem lót), used before foundation. Keep the exact source product and its label claims. Do not depict a serum dropper routine or describe it as HA/B5 serum, skincare treatment, or foundation. Do not invent ingredients or benefits not supported by the source product.";
 }
 
 function targetFramePrompt(store) {
@@ -2990,6 +3214,7 @@ function realPhotoPrompt(task, store, siblingStores = [], variant) {
     `800x800 PNG buyer-style real photo for ${task.productName || "the referenced product"}.`,
     "Keep the same exact item identity: product silhouette, key colors, material finish, packaging size/shape, and recognizable product details must match the source item. It is acceptable to show only part of the set when naturally cropped, but do not change it into another product or generic replacement. Remove or naturally hide any source-store logo/mascot printed on the source packaging; natural buyer photo, not official advertisement.",
     sourceIdentityPrompt(),
+    productCategoryPrompt(task),
     realPhotoStorePrompt(store, siblingStores),
     imageReviewPrompt(task),
     storeSlotCompositionPrompt(store, variant === 1 ? "real1" : "real2"),

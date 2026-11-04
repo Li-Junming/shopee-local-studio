@@ -18,6 +18,55 @@ test("studio UI separates primary workflow from advanced operations", async () =
   assert.ok(html.indexOf("id=\"runAllBtn\"") < html.indexOf("id=\"writeImageConfigBtn\""));
 });
 
+test("studio UI presents the daily workflow before maintenance settings", async () => {
+  const [html, app, css] = await Promise.all([
+    fs.readFile(indexPath, "utf8"),
+    fs.readFile(appPath, "utf8"),
+    fs.readFile(stylesPath, "utf8")
+  ]);
+
+  assert.match(html, /class="flow-overview"/);
+  assert.match(html, /class="quick-intro"/);
+  assert.doesNotMatch(html, /class="api-config-section advanced-section" open/);
+  assert.ok(html.indexOf("id=\"quickTaskText\"") < html.indexOf("id=\"apiConfigForm\""));
+  assert.match(app, /function taskStatusLabel\(/);
+  assert.match(app, /pipeline_failed: "\\u5168\\u6d41\\u7a0b\\u5931\\u8d25"/);
+  assert.match(css, /\.task-status\.error/);
+});
+
+test("quick task entry exposes selectable target stores", async () => {
+  const [html, app] = await Promise.all([
+    fs.readFile(indexPath, "utf8"),
+    fs.readFile(appPath, "utf8")
+  ]);
+
+  assert.match(html, /class="field quick-store-field"/);
+  assert.match(html, /id="storeChecks" class="store-grid"/);
+  assert.ok(html.indexOf("id=\"storeChecks\"") < html.indexOf("id=\"createRunBtn\""));
+  assert.equal((html.match(/id="storeChecks"/g) || []).length, 1);
+  assert.match(app, /storeChecks\.querySelectorAll\("input\[name=targetStores\]:checked"\)/);
+  assert.match(app, /请先勾选至少一个目标店铺/);
+});
+
+test("studio UI exposes a persistent sequential batch queue", async () => {
+  const [html, app, server] = await Promise.all([
+    fs.readFile(indexPath, "utf8"),
+    fs.readFile(appPath, "utf8"),
+    fs.readFile(serverPath, "utf8")
+  ]);
+
+  assert.match(html, /id="batchTaskText"/);
+  assert.match(html, /id="batchCreateStartBtn"/);
+  assert.match(html, /id="batchPauseBtn"/);
+  assert.match(html, /id="batchResumeBtn"/);
+  assert.match(html, /id="batchSkipBtn"/);
+  assert.match(app, /function renderBatchQueue\(/);
+  assert.match(app, /\/api\/batch-queue/);
+  assert.match(server, /async function runBatchQueue\(/);
+  assert.match(server, /await runFullPipeline\(task, \{ wait: true \}\)/);
+  assert.match(server, /recoverBatchQueue\(\)/);
+});
+
 test("studio UI provides a local API configuration panel without exposing raw key state", async () => {
   const [html, app] = await Promise.all([
     fs.readFile(indexPath, "utf8"),
@@ -26,6 +75,10 @@ test("studio UI provides a local API configuration panel without exposing raw ke
 
   assert.match(html, /id="apiConfigForm"/);
   assert.match(html, /id="apiBaseUrl"/);
+  assert.match(html, /id="apiModel"/);
+  assert.match(html, /id="apiFallbackBaseUrl"/);
+  assert.match(html, /id="apiFallbackKey"/);
+  assert.match(html, /id="apiFallbackModel"/);
   assert.match(html, /id="apiKey"/);
   assert.match(html, /id="apiConfigStatus"/);
   assert.match(app, /loadApiConfig\(/);
@@ -154,6 +207,25 @@ test("direct BigSeller save refreshes listing files before launching the save sc
   assert.ok(statusIndex < commandIndex);
 });
 
+test("pipeline reports the real image authentication failure after child output closes", async () => {
+  const server = await fs.readFile(serverPath, "utf8");
+  const handler = server.slice(server.indexOf("function runCommandAsync("), server.indexOf("async function updateStatus("));
+  assert.match(handler, /child\.on\("close"/);
+  assert.match(handler, /child\.stderr\.setEncoding\("utf8"\)/);
+  assert.match(handler, /isImageAuthError\(stderrTail\)/);
+  assert.match(handler, /imageAuthErrorMessage\(\)/);
+});
+
+test("image recovery keeps one queue session and exposes the generating status after config writes", async () => {
+  const server = await fs.readFile(serverPath, "utf8");
+  const recovery = server.slice(server.indexOf("async function runImageGenerationWithRecovery("), server.indexOf("function sleep("));
+  assert.match(server, /const queueSessionId = randomUUID\(\)/);
+  assert.match(server, /runImageGenerationWithRecovery\(task, imageCount, imageRoutes, queueSessionId\)/);
+  assert.match(recovery, /writeImage2Config\(task, \{ model: imageRoute\.model, queueSessionId \}\);\s*await updateStatus\(task, "pipeline_generating_images"\)/);
+  assert.match(recovery, /if \(!authError && !error\.retryable\) throw error/);
+  assert.match(server, /imageProcessFailure\(stderrTail, code\)/);
+});
+
 test("one-click pipeline marks a task active before launching the background worker", async () => {
   const server = await fs.readFile(serverPath, "utf8");
   const runFullPipeline = server.slice(
@@ -191,6 +263,7 @@ test("pipeline progress renders timing-focused step cards", async () => {
   assert.match(app, /progress\.timing/);
   assert.match(css, /\.pipeline-step-card/);
   assert.match(css, /\.pipeline-metrics/);
+  assert.match(app, /progress\?\.level === "error"[\s\S]*?"\\u5df2\\u505c\\u6b62"/);
 });
 
 test("pipeline progress makes failed tasks visibly incomplete", async () => {
@@ -259,9 +332,55 @@ test("one-click controls are disabled while pipeline is running and show complet
 
   assert.match(app, /function isPipelineRunning\(/);
   assert.match(app, /setPrimaryPipelineButtonState\(/);
+  assert.doesNotMatch(app, /return level === "running" \|\| \[/);
   assert.match(app, /runAllBtn\.disabled = !selectedTask \|\| running/);
+  assert.match(app, /function pipelineActionLabel\(task\)/);
+  assert.match(app, /\\u4e00\\u952e\\u7ee7\\u7eed\\u5168\\u6d41\\u7a0b/);
   assert.match(app, /createRunBtn\.disabled = isPipelineRunning/);
   assert.match(app, /\\u5df2\\u4fdd\\u5b58\\u5230 BigSeller \\u8349\\u7a3f\\u7bb1/);
+});
+
+test("task status auto-refreshes without replacing listing editors", async () => {
+  const [html, app] = await Promise.all([
+    fs.readFile(indexPath, "utf8"),
+    fs.readFile(appPath, "utf8")
+  ]);
+  const liveRefresh = app.slice(
+    app.indexOf("async function refreshSelectedTaskLive"),
+    app.indexOf("async function handleImagePaste")
+  );
+
+  assert.match(html, /id="liveRefreshState"/);
+  assert.match(app, /setInterval\(refreshLiveState, 2000\)/);
+  assert.match(app, /refreshSelectedTaskLive\(\)/);
+  assert.match(app, /loadBatchQueue\(false\)/);
+  assert.match(liveRefresh, /renderTaskSummary\(selectedTask\)/);
+  assert.match(liveRefresh, /renderPreflight\(\)/);
+  assert.doesNotMatch(liveRefresh, /renderListings\(/);
+});
+
+test("pipeline reuses an existing task source manifest without another BigSeller lookup", async () => {
+  const server = await fs.readFile(serverPath, "utf8");
+  const ensureSource = server.slice(
+    server.indexOf("async function ensureSourceImages"),
+    server.indexOf("async function useFallbackSource")
+  );
+
+  assert.match(ensureSource, /readSourceManifest\(task\)/);
+  assert.match(ensureSource, /BigSeller lookup is not repeated/);
+  assert.match(ensureSource, /preserveStatus: true/);
+});
+
+test("one-click pipeline resume preserves completed images and generates only missing outputs", async () => {
+  const server = await fs.readFile(serverPath, "utf8");
+  const pipeline = server.slice(
+    server.indexOf("async function runFullPipeline"),
+    server.indexOf("async function fileExists")
+  );
+
+  assert.match(pipeline, /Preserve \$\{imageCount\} generated image\(s\); generate missing images only/);
+  assert.doesNotMatch(pipeline, /archiveCurrentImages\(task, "full-pipeline-rerun"\)/);
+  assert.match(pipeline, /buildImage2CliArgs\(\{/);
 });
 
 test("secondary mutating actions are disabled while the pipeline is running", async () => {
