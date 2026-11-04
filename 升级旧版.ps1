@@ -10,11 +10,11 @@ if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw 'A stable release tag is requ
 if ($LASTEXITCODE -ne 0) { throw 'Download failed. The current program was not changed.' }
 $bootstrap = Join-Path $InstallRoot '.studio-updates\bootstrap'
 New-Item -ItemType Directory -Path (Join-Path $bootstrap 'scripts') -Force | Out-Null
-foreach ($entry in @(@{ source='scripts/deployment.ps1'; target='scripts\deployment.ps1' }, @{ source='更新网站.ps1'; target='updater.ps1' })) {
-  $text = & git -C $InstallRoot show "refs/tags/${Version}:$($entry.source)"
-  if ($LASTEXITCODE -ne 0) { throw 'Release does not contain a compatible updater.' }
-  [IO.File]::WriteAllText((Join-Path $bootstrap $entry.target), ($text -join "`r`n"), [Text.UTF8Encoding]::new($true))
-}
+$archive = Join-Path $bootstrap 'updater.zip'
+& git -C $InstallRoot archive --format=zip "--output=$archive" "refs/tags/$Version" -- 'scripts/deployment.ps1' '更新网站.ps1'
+if ($LASTEXITCODE -ne 0) { throw 'Release does not contain a compatible updater.' }
+Expand-Archive -LiteralPath $archive -DestinationPath $bootstrap -Force
+Copy-Item -LiteralPath (Join-Path $bootstrap '更新网站.ps1') -Destination (Join-Path $bootstrap 'updater.ps1') -Force
 # Run the new maintenance code outside tracked files. Old releases can therefore
 # be backed up and upgraded without first overwriting their program files.
 & (Join-Path $bootstrap 'updater.ps1') -Version $Version -InstallRoot $InstallRoot

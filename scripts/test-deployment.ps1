@@ -9,6 +9,13 @@ function Run-Git($Root, [string[]]$GitArgs) {
   if ($LASTEXITCODE -ne 0) { throw "Fixture Git failed: $($GitArgs[0])" }
   return $output
 }
+$encodingArchive = Join-Path $suite 'encoding.zip'
+Run-Git $repo @('archive','--format=zip',"--output=$encodingArchive",'HEAD','--','scripts/deployment.ps1','更新网站.ps1') | Out-Null
+$encodingDir = Join-Path $suite 'encoding'
+Expand-Archive -LiteralPath $encodingArchive -DestinationPath $encodingDir
+$scriptBytes = [IO.File]::ReadAllBytes((Join-Path $encodingDir '更新网站.ps1'))
+Assert-True ($scriptBytes[0] -eq 239 -and $scriptBytes[1] -eq 187 -and $scriptBytes[2] -eq 191) 'Upgrade archive did not preserve UTF-8 BOM.'
+Write-Host 'PASS Git archive preserves Chinese script filename and UTF-8 BOM.'
 function New-Fixture($Name) {
   $root = Join-Path $suite $Name
   New-Item -ItemType Directory -Path $root | Out-Null

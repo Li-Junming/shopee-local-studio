@@ -47,7 +47,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Archive failed' }
           (Get-FileHash shopee-local-studio.zip -Algorithm SHA256).Hash.ToLower() + '  shopee-local-studio.zip' | Set-Content SHA256SUMS.txt -Encoding ascii
       - name: Publish verified release
-        shell: powershell
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release create $env:GITHUB_REF_NAME shopee-local-studio.zip SHA256SUMS.txt './升级旧版.ps1' --verify-tag --title "Shopee Local Studio $env:GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
