@@ -4,10 +4,10 @@
 
 ## 老板已有旧版：首次升级
 
-不用重新建目录，也不用搬动任务和图片。先让旧版商品任务完成，再从本仓库最新 Release 下载 `升级旧版.ps1`，在 PowerShell 执行：
+不用重新建目录，也不用搬动任务和图片。先让旧版商品任务完成，再从本仓库最新 Release 下载 `upgrade-existing.ps1`（仓库源码名为 `升级旧版.ps1`），在 PowerShell 执行：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\升级旧版.ps1" -InstallRoot "C:\ShopeeLocalStudio\ni"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\upgrade-existing.ps1" -InstallRoot "C:\ShopeeLocalStudio\ni"
 ```
 
 如果老板原来装在其他目录，将 `-InstallRoot` 改成原来包含 `.git` 和 `tools` 的目录。脚本只从本仓库的稳定版本标签读取更新器；先检查运行任务和本地代码修改，再备份旧版，最后更新。下载或检查失败时保留现有程序。

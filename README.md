@@ -1,6 +1,6 @@
 # Shopee Local Studio
 
-Windows users: see [新版部署、老板旧版升级与回退](DEPLOYMENT.md). From v0.2.0, use the `.cmd` launchers for startup, stable-release updates and rollback. Existing installations can use the standalone `升级旧版.ps1` release asset without moving local tasks or images.
+Windows users: see [新版部署、老板旧版升级与回退](DEPLOYMENT.md). From v0.2.0, use the `.cmd` launchers for startup, stable-release updates and rollback. Existing installations can use the standalone `upgrade-existing.ps1` release asset without moving local tasks or images.
 
 Shopee Local Studio is a local automation workspace for Shopee cross-border listing operations. It connects product lookup, BigSeller draft copying, store-specific image generation, listing copy preparation, and draft saving into one repeatable workflow.
 

@@ -50,4 +50,6 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME shopee-local-studio.zip SHA256SUMS.txt './升级旧版.ps1' --verify-tag --title "Shopee Local Studio $env:GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
+        run: |
+          Copy-Item -LiteralPath './升级旧版.ps1' -Destination upgrade-existing.ps1
+          gh release create $env:GITHUB_REF_NAME shopee-local-studio.zip SHA256SUMS.txt upgrade-existing.ps1 --verify-tag --title "Shopee Local Studio $env:GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
