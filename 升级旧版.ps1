@@ -4,7 +4,14 @@ $InstallRoot = (Resolve-Path -LiteralPath $InstallRoot).Path
 if (-not (Test-Path -LiteralPath (Join-Path $InstallRoot '.git'))) { throw 'Select the original Git installation directory (the folder containing tools and .git).' }
 $origin = & git -C $InstallRoot remote get-url origin
 if ($LASTEXITCODE -ne 0 -or $origin.TrimEnd('/') -notin @('https://github.com/Li-Junming/shopee-local-studio.git','https://github.com/Li-Junming/shopee-local-studio','git@github.com:Li-Junming/shopee-local-studio.git')) { throw 'Not the expected repository.' }
-if (-not $Version) { $Version = (Invoke-RestMethod 'https://api.github.com/repos/Li-Junming/shopee-local-studio/releases/latest' -Headers @{ 'User-Agent'='ShopeeLocalStudio-Upgrader' }).tag_name }
+if (-not $Version) {
+  # Resolve GitHub's published-release redirect without the anonymous REST API.
+  $response = Invoke-WebRequest 'https://github.com/Li-Junming/shopee-local-studio/releases/latest' -Method Head -UseBasicParsing -TimeoutSec 30
+  $uri = $response.BaseResponse.ResponseUri
+  if (-not $uri) { $uri = $response.BaseResponse.RequestMessage.RequestUri }
+  if ([string]$uri -notmatch '/releases/tag/(v\d+\.\d+\.\d+)/?$') { throw 'Could not resolve latest published release. Specify -Version vX.Y.Z explicitly.' }
+  $Version = $Matches[1]
+}
 if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw 'A stable release tag is required.' }
 & git -C $InstallRoot fetch origin --tags
 if ($LASTEXITCODE -ne 0) { throw 'Download failed. The current program was not changed.' }

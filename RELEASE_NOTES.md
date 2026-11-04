@@ -1,4 +1,7 @@
-# v0.2.1
+# v0.2.2
+
+- 修正 Windows PowerShell 5.1 的 Node 版本检测：使用 `node --version`，不再传递包含引号的 JavaScript。
+- 最新正式版检测改为 GitHub Release 页面跳转，避免匿名 REST API 限流；仍支持 `-Version` 指定正式版本。
 
 - 修正 GitHub Windows 发布步骤的中文路径编码；旧版升级脚本通过 Git 归档解包，保留脚本原始编码。
 

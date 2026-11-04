@@ -31,7 +31,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downlo
 ```powershell
 git clone https://github.com/Li-Junming/shopee-local-studio.git C:\ShopeeLocalStudio\ni
 cd C:\ShopeeLocalStudio\ni
-git checkout --detach v0.2.1
+git checkout --detach v0.2.2
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\首次部署.ps1
 ```
 
@@ -45,7 +45,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\首次部署.ps1
 
 1. 运行三个模块测试及 `scripts/test-deployment.ps1`，检查提交中没有密钥、本地数据或浏览器资料。
 2. 更新 `VERSION.json` 和 `RELEASE_NOTES.md`，提交代码。
-3. 推送对应的稳定标签，如 `v0.2.1`。
+3. 推送对应的稳定标签，如 `v0.2.2`。
 4. `Stable release` 工作流测试通过后才会发布源码 ZIP、SHA-256 校验文件和旧版升级脚本。工作流失败时，不会生成正式 Release。
 
 以下英文内容保留作早期版本参考；**日常更新请使用上面的更新脚本，避免直接在运行中的网站上执行 git pull**。

@@ -4,8 +4,7 @@ $ErrorActionPreference = 'Stop'
 Assert-StudioRepository
 Assert-StudioIdle
 if (-not $Version) {
-  $release = Invoke-RestMethod 'https://api.github.com/repos/Li-Junming/shopee-local-studio/releases/latest' -Headers @{ 'User-Agent'='ShopeeLocalStudio-Updater' }
-  $Version = [string]$release.tag_name
+  $Version = Get-PublishedStudioVersion
 }
 if ($Version -notmatch '^v\d+\.\d+\.\d+$') { throw 'Only stable release tags such as v0.2.0 are supported.' }
 Invoke-StudioGit -Arguments @('fetch','origin','--tags') | Out-Null

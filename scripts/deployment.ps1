@@ -1,6 +1,23 @@
 ﻿$script:StudioRoot = if ($InstallRoot) { (Resolve-Path -LiteralPath $InstallRoot).Path } else { Split-Path -Parent $PSScriptRoot }
 $script:StudioTool = Join-Path $script:StudioRoot 'tools\shopee_local_studio'
 
+function Get-PublishedStudioVersion {
+  param([string]$LatestUrl = 'https://github.com/Li-Junming/shopee-local-studio/releases/latest')
+  $response = Invoke-WebRequest -Uri $LatestUrl -Method Head -UseBasicParsing -TimeoutSec 30
+  $uri = $response.BaseResponse.ResponseUri
+  if (-not $uri) { $uri = $response.BaseResponse.RequestMessage.RequestUri }
+  if ([string]$uri -notmatch '/releases/tag/(v\d+\.\d+\.\d+)/?$') { throw 'Could not resolve the latest published release. Specify -Version vX.Y.Z explicitly.' }
+  return $Matches[1]
+}
+
+function Get-StudioNodeMajor {
+  param([Parameter(Mandatory=$true)][string]$NodePath)
+  # Native --version needs no embedded JavaScript quotes on Windows PowerShell 5.1.
+  $version = [string]((& $NodePath --version) | Select-Object -Last 1)
+  if ($LASTEXITCODE -ne 0 -or $version.Trim() -notmatch '^v?(\d+)\.') { throw 'Could not read the Node.js version.' }
+  return [int]$Matches[1]
+}
+
 function Invoke-StudioGit {
   param([string[]]$Arguments)
   $result = & git -C $script:StudioRoot @Arguments
@@ -92,7 +109,7 @@ function Restore-StudioDependencies {
 
 function Install-StudioDependencies {
   $node = Initialize-StudioRuntime
-  $major = [int]((& $node -p 'process.versions.node.split(".")[0]') | Select-Object -Last 1)
+  $major = Get-StudioNodeMajor -NodePath $node
   if ($major -lt 22) { throw 'Node.js 22 or newer is required. Install Node.js LTS with npm.' }
   $npm = Join-Path (Split-Path -Parent $node) 'npm.cmd'
   if (-not (Test-Path -LiteralPath $npm)) {

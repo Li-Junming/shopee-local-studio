@@ -31,6 +31,10 @@ jobs:
         if: matrix.module == 'tools/shopee_local_studio'
         shell: powershell
         run: ./scripts/test-deployment.ps1
+      - name: Test Windows PowerShell 5.1 compatibility
+        if: matrix.module == 'tools/shopee_local_studio'
+        shell: powershell
+        run: ./scripts/test-deployment-compatibility.ps1
   publish:
     needs: test
     runs-on: windows-latest
